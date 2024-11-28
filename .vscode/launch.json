@@ -1,0 +1,17 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args1": ["--exp_name", "test_1", "--revision", "2", "--debug"],
+            "args": ["--config_file", "configs/default.yaml", "--test_only", "--num_samples", "10", "--sample_steps", "100", "--no_wandb", "--ckpt_path", "/root/zqs_project/drug/MolCRAFT/logs/root_bfn_sbdd/add_all/1/checkpoints/epoch11-val_loss5.61-mol_stable0.00-complete0.00-vina_score0.00.ckpt"]
+        }
+    ]
+}
