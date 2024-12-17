@@ -277,7 +277,7 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
         global_block = []
         for l_idx in range(self.num_layers):
             layer = AttentionLayerO2TwoUpdateNodeGeneral(
-                self.hidden_dim, self.n_heads, self.num_r_gaussian, self.edge_feat_dim, act_fn=self.act_fn,
+                self.hidden_dim, self.n_heads, self.num_r_gaussian, 7, act_fn=self.act_fn,
                 norm=self.norm,
                 num_x2h=self.num_x2h, num_h2x=self.num_h2x, r_max=self.r_max, num_node_types=self.num_node_types,
                 ew_net_type=self.ew_net_type, x2h_out_fc=self.x2h_out_fc, sync_twoup=self.sync_twoup,
@@ -467,26 +467,26 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
             # edge_type_r = edge_type_r[self_loop_mask]
             # edge_type_atom = F.one_hot(edge_type_r, num_classes=3)
             
-            ## 多级边
-            # edge_index_2p7 = radius_graph(x, r=1.35, batch=batch, flow='source_to_target')
-            # edge_index_3p4 = radius_graph(x, r=1.7, batch=batch, flow='source_to_target')
-            # edge_index_4p9 = radius_graph(x, r=2.5, batch=batch, flow='source_to_target')
-            # edge_index_4p9 = remove_subset_edges(edge_index_4p9, edge_index_3p4)
-            # edge_index_3p4 = remove_subset_edges(edge_index_3p4, edge_index_2p7)
-            # edge_type_2p7 = torch.full((edge_index_2p7.size(1),), 0, dtype=torch.long, device=edge_index_2p7.device)  # 类型 0
-            # edge_type_3p4 = torch.full((edge_index_3p4.size(1),), 1, dtype=torch.long, device=edge_index_3p4.device)  # 类型 1
-            # edge_type_4p9 = torch.full((edge_index_4p9.size(1),), 2, dtype=torch.long, device=edge_index_4p9.device)  # 类型 2
-            # edge_index = torch.cat([edge_index_2p7, edge_index_3p4, edge_index_4p9], dim=-1)
-            # edge_type_atom = torch.cat([edge_type_2p7, edge_type_3p4, edge_type_4p9], dim=-1)
-            # edge_type_atom = F.one_hot(edge_type_atom, num_classes=3)
-            edge_index = self._connect_edge(x, mask_ligand, batch)
+            # 多级边
+            edge_index_2p7 = radius_graph(x, r=1.35, batch=batch, flow='source_to_target')
+            edge_index_3p4 = radius_graph(x, r=1.7, batch=batch, flow='source_to_target')
+            edge_index_4p9 = radius_graph(x, r=2.5, batch=batch, flow='source_to_target')
+            edge_index_4p9 = remove_subset_edges(edge_index_4p9, edge_index_3p4)
+            edge_index_3p4 = remove_subset_edges(edge_index_3p4, edge_index_2p7)
+            edge_type_2p7 = torch.full((edge_index_2p7.size(1),), 0, dtype=torch.long, device=edge_index_2p7.device)  # 类型 0
+            edge_type_3p4 = torch.full((edge_index_3p4.size(1),), 1, dtype=torch.long, device=edge_index_3p4.device)  # 类型 1
+            edge_type_4p9 = torch.full((edge_index_4p9.size(1),), 2, dtype=torch.long, device=edge_index_4p9.device)  # 类型 2
+            edge_index = torch.cat([edge_index_2p7, edge_index_3p4, edge_index_4p9], dim=-1)
+            edge_type_atom = torch.cat([edge_type_2p7, edge_type_3p4, edge_type_4p9], dim=-1)
+            edge_type_atom = F.one_hot(edge_type_atom, num_classes=3)
+            
+            # edge_index = self._connect_edge(x, mask_ligand, batch)
             src, dst = edge_index
             edge_type_mol = self._build_edge_type(edge_index, mask_ligand)
             edge_type = edge_type_mol
-            # edge_type = torch.cat([edge_type_atom, edge_type_mol], dim=-1)            
-            # edge type (dim: 4)
+            edge_type = torch.cat([edge_type_atom, edge_type_mol], dim=-1)            
+  
             # edge_type_type = self._build_edge_type(edge_index, mask_ligand)
-            # edge_type = torch.cat([edge_type_type, edge_type_r], dim=-1)
             if self.ew_net_type == 'global':
                 dist = torch.norm(x[dst] - x[src], p=2, dim=-1, keepdim=True)
                 dist_feat = self.distance_expansion(dist)

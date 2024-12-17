@@ -5,15 +5,16 @@ License: GNU General Public License v2.0
 https://github.com/mattragoza/liGAN/blob/master/LICENSE
 """
 import itertools
-
+import os
+from rdkit.Chem import AllChem as Chem
 import numpy as np
 from rdkit.Chem import AllChem
 from rdkit import Geometry
 from openbabel import openbabel as ob
 from scipy.spatial.distance import pdist
 from scipy.spatial.distance import squareform
-
-
+from core.utils.transforms import map_atomic_number_to_atom_symbol 
+import tempfile
 class MolReconError(Exception):
     pass
 
@@ -488,7 +489,7 @@ def reconstruct_from_generated(xyz, atomic_nums, aromatic=None, basic_mode=True)
     if basic_mode:
         indicators = None
     else:
-        indicators = aromatic
+        indicators = aromatic.tolist()
 
     if isinstance(xyz, np.ndarray):
         xyz = xyz.tolist()
@@ -547,4 +548,44 @@ def reconstruct_from_generated(xyz, atomic_nums, aromatic=None, basic_mode=True)
     except:
         raise MolReconError()
 
+    return rd_mol
+
+def write_xyz_file(coords, atom_types, filename):
+    dir = os.path.dirname(filename)
+    if not os.path.exists(dir):
+        os.mkdir(dir)
+    filename = filename + '.xyz'
+    out = f"{len(coords)}\n\n"
+    assert len(coords) == len(atom_types)
+    for i in range(len(coords)):
+        out += f"{atom_types[i]} {coords[i, 0]:.3f} {coords[i, 1]:.3f} {coords[i, 2]:.3f}\n"
+    with open(filename, 'w') as f:
+        f.write(out)
+    return filename
+
+def obabel_recover_bond(positions, atom_types):
+    atom_types = [map_atomic_number_to_atom_symbol[idx] for idx in atom_types]
+    with tempfile.NamedTemporaryFile() as tmp:
+        temp_dir = './temp'
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+            
+        tmp_file = './temp' + tmp.name
+
+        # Write xyz file
+        xyz_file = write_xyz_file(np.array(positions), atom_types, tmp_file)
+        sdf_file = tmp_file + '.sdf'
+        # subprocess.run(f'obabel {xyz_file} -O {sdf_file}', shell=True)
+
+        # Convert to sdf file with openbabel
+        # openbabel will add bonds
+        obConversion = ob.OBConversion()
+        obConversion.SetInAndOutFormats("xyz", "sdf")
+        ob_mol = ob.OBMol()
+        obConversion.ReadFile(ob_mol, xyz_file)
+
+        obConversion.WriteFile(ob_mol, sdf_file)
+
+        # Read sdf file with RDKit
+        rd_mol = Chem.SDMolSupplier(sdf_file, sanitize=False)[0]
     return rd_mol

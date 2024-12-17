@@ -10,9 +10,9 @@ import AutoDockTools
 import os
 import contextlib
 import numpy as np
-
+from openbabel import pybel
 from core.evaluation.docking_qvina import get_random_id, BaseDockingTask
-
+from openbabel import openbabel
 
 def suppress_stdout(func):
     def wrapper(*a, **ka):
@@ -154,16 +154,16 @@ class VinaDock(object):
     #     v.set_ligand_from_file(self.lig_pdbqt)
     #     return 0
 
-    def dock(self, score_func='vina', seed=0, mode='dock', exhaustiveness=8, save_pose=False, **kwargs):  # seed=0 mean random seed
+    def dock(self, score_func='vina', seed=0, mode='dock', exhaustiveness=8, save_pose=False,save_dir='./tmp', save_name=None, **kwargs):  # seed=0 mean random seed
         v = Vina(sf_name=score_func, seed=seed, verbosity=0, **kwargs)
         
-        prot_code = self.check_pdbqt_str(self.prot_pdbqt)
-        if prot_code > 0:
-            raise ValueError(f'atom type {self.pdbqt_code_map[prot_code]} cannot be parsed')
-        else:
-            lig_code = self.check_pdbqt_str(self.lig_pdbqt)
-            if lig_code > 0:
-                raise ValueError(f'atom type {self.pdbqt_code_map[lig_code]} cannot be parsed')
+        # prot_code = self.check_pdbqt_str(self.prot_pdbqt)
+        # if prot_code > 0:
+        #     raise ValueError(f'atom type {self.pdbqt_code_map[prot_code]} cannot be parsed')
+        # else:
+        #     lig_code = self.check_pdbqt_str(self.lig_pdbqt)
+        #     if lig_code > 0:
+        #         raise ValueError(f'atom type {self.pdbqt_code_map[lig_code]} cannot be parsed')
         
         v.set_receptor(self.prot_pdbqt)
         v.set_ligand_from_file(self.lig_pdbqt)
@@ -194,6 +194,14 @@ class VinaDock(object):
                 pose = v.poses(n_poses=1)
             else:
                 raise ValueError
+            # v.write_pose(os.path.join('./tmp', "saved_pose_{}".format(os.path.basename(self.lig_pdbqt))), overwrite=True)
+            # obConversion = openbabel.OBConversion()
+            # obConversion.SetInAndOutFormats("pdbqt", "sdf")
+            # ob_mol = openbabel.OBMol()
+            # obConversion.ReadFile(ob_mol, os.path.join('./tmp', "saved_pose_{}".format(os.path.basename(self.lig_pdbqt))))
+            # save_name = os.path.basename(save_name).split('.')[0] if save_name is not None else 'pose'
+            # obConversion.WriteFile(ob_mol, os.path.join(save_dir, f"docked_{save_name}.sdf"))
+
             return score, pose
 
 
@@ -228,7 +236,11 @@ class VinaDockingTask(BaseDockingTask):
         )
         protein_path = os.path.join(protein_root, protein_fn)
         return cls(protein_path, ligand_rdmol, **kwargs)
-
+    
+    @classmethod
+    def from_generated_mol_eval(cls, ligand_rdmol, protein_path, center=None):
+        # load original pdb
+        return cls(protein_path, ligand_rdmol, center=center)
     def __init__(self, protein_path, ligand_rdmol, tmp_dir='./tmp', center=None,
                  size_factor=1., buffer=5.0, pos=None):
         super().__init__(protein_path, ligand_rdmol)
@@ -289,9 +301,9 @@ class VinaDockingTask(BaseDockingTask):
         dock.pocket_center, dock.box_size = self.center, [self.size_x, self.size_y, self.size_z]
         try:
             score, pose = dock.dock(score_func='vina', mode=mode, exhaustiveness=exhaustiveness, save_pose=True, **kwargs)
-            return [{'affinity': score, 'pose': pose}]
+            return {'affinity': score, 'pose': pose}
         except Exception as e:
-            return [{'affinity': np.nan, 'pose': 'None'}]
+            return {'affinity': np.nan, 'pose': 'None'}
 
     # def tmp_run(self, mode='dock', exhaustiveness=8, **kwargs):
     #     ligand_pdbqt = self.ligand_path[:-4] + '.pdbqt'

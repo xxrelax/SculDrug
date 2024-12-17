@@ -59,15 +59,15 @@ class BasicResults:
 
     @property
     def vina_score_list(self):
-        return np.array([(x['vina']['score_only'][0]['affinity'] if 'vina' in x else np.nan) for x in self.results])
+        return np.array([(x['vina']['score_only']['affinity'] if 'vina' in x else np.nan) for x in self.results])
     
     @property
     def vina_min_list(self):
-        return np.array([(x['vina']['minimize'][0]['affinity'] if 'vina' in x else np.nan) for x in self.results])
+        return np.array([(x['vina']['minimize']['affinity'] if 'vina' in x else np.nan) for x in self.results])
     
     @property
     def vina_dock_list(self):
-        return np.array([(x['vina']['dock'][0]['affinity'] if 'vina' in x else np.nan) for x in self.results])
+        return np.array([(x['vina']['dock']['affinity'] if 'vina' in x else np.nan) for x in self.results])
 
     @property
     def strain_list(self):

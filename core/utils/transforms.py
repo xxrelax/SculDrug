@@ -44,7 +44,7 @@ MAP_ATOM_TYPE_ONLY_TO_INDEX = {
     16: 6,
     17: 7,
 }
-
+map_atomic_number_to_atom_symbol = {1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F', 15: 'P', 16: 'S', 17: 'Cl'}
 MAP_ATOM_TYPE_AROMATIC_TO_INDEX = {
     (1, False): 0,
     (6, False): 1,

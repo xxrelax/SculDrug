@@ -48,16 +48,20 @@ def get_dataloader(cfg):
             train_indices = list(range(min(len(train_set), 50)))
             test_indices = list(range(min(len(test_set), 10)))
             train_set = torch.utils.data.Subset(train_set, train_indices)
-            test_set = torch.utils.data.Subset(test_set, test_indices)
             val_set = test_set
             torch.save(train_set, "./small_data/debug_set.pth")
             torch.save(test_set, "./small_data/test_set.pth")
+    elif cfg.test_only:
+            test_set = torch.load("./small_data/test_set.pth")
+            train_set = test_set
+            val_set = test_set
     else:
         if cfg.data.name == 'pl_tr':
             dataset, subsets = get_dataset(config=cfg.data)
             train_set, test_set = subsets['train'], subsets['test']        
             cfg.dynamics.protein_atom_feature_dim = dataset.protein_atom_feature_dim
             cfg.dynamics.ligand_atom_feature_dim = dataset.ligand_atom_feature_dim
+            torch.save(test_set, "./small_data/test_set.pth")
         else:
             protein_featurizer = trans.FeaturizeProteinAtom()
             ligand_featurizer = trans.FeaturizeLigandAtom(cfg.data.transform.ligand_atom_mode)
@@ -88,8 +92,8 @@ def get_dataloader(cfg):
         debug_set_val = torch.utils.data.Subset(val_set, [0] * 10)
         cfg.train.val_freq = 4
         # get debug set val data batch
-        debug_batch_val = next(iter(DataLoader(debug_set_val, batch_size=cfg.train.batch_size, shuffle=False)))
-        print(f"debug batch val: {debug_batch_val.ligand_filename}")
+        # debug_batch_val = next(iter(DataLoader(debug_set_val, batch_size=cfg.train.batch_size, shuffle=False)))
+        # print(f"debug batch val: {debug_batch_val.ligand_filename}")
         train_loader = DataLoader(debug_set,
             batch_size=cfg.train.batch_size,
             shuffle=False,  # set shuffle to False 
@@ -192,17 +196,17 @@ if __name__ == "__main__":
     parser.add_argument("--test_only", action="store_true")
     
     # global config
-    parser.add_argument('--seed', type=int, default=1234)
+    parser.add_argument('--seed', type=int, default=2025)
     parser.add_argument("--no_wandb", action="store_true")
     parser.add_argument("--logging_level", type=str, default="warning")
-
+    parser.add_argument("--devices", type=str, default="1", help="Comma-separated list of device IDs (e.g., '0,1,2')")   
     # train data params
     parser.add_argument('--random_rot', action='store_true')
     parser.add_argument("--pos_noise_std", type=float, default=0)    
     parser.add_argument("--pos_normalizer", type=float, default=2.0)    
     
     # train params
-    parser.add_argument("--batch_size", type=int, default=8)
+    parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=15)
     parser.add_argument('--v_loss_weight', type=float, default=1)
     parser.add_argument('--lr', type=float, default=5e-4)
@@ -254,7 +258,7 @@ if __name__ == "__main__":
     set_test_output_dir(cfg)
 
     seed_everything(cfg.seed, workers=True)
-
+    devices = list(map(int, _args.devices.split(',')))
     logging_level = {
         "info": logging.INFO,
         "debug": logging.DEBUG,
@@ -295,17 +299,17 @@ if __name__ == "__main__":
     print(f"The config of this process is:\n{cfg}")
 
     model = SBDDTrainLoop(config=cfg)
-    if cfg.train.checkpoint:    
-        ckpt = torch.load(cfg.train.checkpoint, map_location="cuda")
-        model.load_state_dict(ckpt['state_dict'])
-        print(f'Successfully load the model! {cfg.train.checkpoint}')
+    # if cfg.train.checkpoint:    
+    #     ckpt = torch.load(cfg.train.checkpoint, map_location="cuda")
+    #     model.load_state_dict(ckpt['state_dict'])
+    #     print(f'Successfully load the model! {cfg.train.checkpoint}')
     trainer = pl.Trainer(
         # deterministic=True,
         strategy='ddp_find_unused_parameters_true',
         default_root_dir=cfg.accounting.logdir,
         max_epochs=cfg.train.epochs,
         check_val_every_n_epoch=cfg.train.ckpt_freq,
-        devices=[1],
+        devices=devices,
         logger=wandb_logger,
         num_sanity_val_steps=0,
         inference_mode=not cfg.test_only,
@@ -363,3 +367,5 @@ if __name__ == "__main__":
     else:
         trainer.test(model, dataloaders=test_loader, ckpt_path=cfg.evaluation.ckpt_path)
 
+# python train_bfn.py --config_file configs/default.yaml --exp_name all_mult_edge --revision 2
+# python train_bfn.py --config_file configs/default.yaml --test_only --num_samples 10 --sample_steps 100 --no_wandb --ckpt_path 

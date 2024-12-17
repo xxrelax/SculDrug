@@ -149,3 +149,7 @@ gitconfig
 logs/
 pt_results
 output/
+temp/
+result*/
+data.tar.gz
+denovo/

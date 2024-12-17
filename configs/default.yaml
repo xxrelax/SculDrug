@@ -81,7 +81,7 @@ visual:
 
 
 train:
-  checkpoint: /root/zqs_project/drug/MolCRAFT/logs/root_bfn_sbdd/add_all/1/checkpoints/epoch05-val_loss5.77-mol_stable0.00-complete0.00-vina_score0.00.ckpt
+  checkpoint: 
   batch_size: !SUB ${batch_size}
   num_workers: 8
   pos_noise_std: !SUB ${pos_noise_std}

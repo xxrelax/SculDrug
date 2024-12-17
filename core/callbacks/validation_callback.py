@@ -25,7 +25,8 @@ from core.evaluation.visualization import visualize, visualize_chain
 from core.models.sbdd_train_loop import build_local_coordinate_system
 from core.utils import transforms as trans
 from core.evaluation.utils import timing
-from core.utils.reconstruct import reconstruct_from_generated, MolReconError
+from core.utils.rdkit_utiles import evaluate_validity
+from core.utils.reconstruct import reconstruct_from_generated, MolReconError, obabel_recover_bond
 
 # this file contains the model which we used to visualize the
 
@@ -64,34 +65,39 @@ def reconstruct_mol_and_filter_invalid(out_list):
         protein_pos = protein_pos.cpu().numpy().astype('float64')
         # TODO turn off basic_mode = False to use predicted aromaticity
         try:
-            mol = reconstruct_from_generated(pos, atom_type, is_aromatic, basic_mode=True)
-            n_recon += 1
+            try:
+                mol = reconstruct_from_generated(pos, atom_type, is_aromatic, basic_mode=False)
+            except:
+                mol = obabel_recover_bond(pos, atom_type)
+            mol, success = evaluate_validity(mol, -1, 0.8)
+            if success:
+                n_recon += 1
 
-            mol_center = pos.mean(axis=0)
-            protein_center = protein_pos.mean(axis=0)
-            center_change = np.linalg.norm(mol_center - protein_center)
-            mol_pos_range = np.linalg.norm(pos.max(axis=0)[0] - pos.min(axis=0)[0])
+                mol_center = pos.mean(axis=0)
+                protein_center = protein_pos.mean(axis=0)
+                center_change = np.linalg.norm(mol_center - protein_center)
+                mol_pos_range = np.linalg.norm(pos.max(axis=0)[0] - pos.min(axis=0)[0])
 
-            res = {
-                'mol': mol, 'ligand_filename': ligand_filename, 
-                'pred_pos': pos, 'pred_v': atom_type, 'is_aromatic': is_aromatic,
-                'protein_center': protein_center, 'mol_center': mol_center,
-                'center_change': center_change, 'mol_pos_range': mol_pos_range,
-            }
-            center_change_list.append(center_change)
-            mol_pos_range_list.append(mol_pos_range)
+                res = {
+                    'mol': mol, 'ligand_filename': ligand_filename, 
+                    'pred_pos': pos, 'pred_v': atom_type, 'is_aromatic': is_aromatic,
+                    'protein_center': protein_center, 'mol_center': mol_center,
+                    'center_change': center_change, 'mol_pos_range': mol_pos_range,
+                }
+                center_change_list.append(center_change)
+                mol_pos_range_list.append(mol_pos_range)
 
-            Chem.SanitizeMol(mol)
-            smiles = Chem.MolToSmiles(mol)
-            complete = smiles is not None and '.' not in smiles
-            validity = smiles is not None
+                Chem.SanitizeMol(mol)
+                smiles = Chem.MolToSmiles(mol)
+                complete = smiles is not None and '.' not in smiles
+                validity = smiles is not None
 
-            n_complete += int(complete)
-            n_valid += int(validity)
-            res['smiles'] = smiles                    
-            res['complete'] = complete
-            res['validity'] = validity
-            results.append(res)
+                n_complete += int(complete)
+                n_valid += int(validity)
+                res['smiles'] = smiles                    
+                res['complete'] = complete
+                res['validity'] = validity
+                results.append(res)
         except Exception as e:
             continue
 
@@ -247,23 +253,23 @@ class ValidationCallback(Callback):
             )
             print(json.dumps(recon_loss, indent=4))
 
-    # def on_validation_batch_end(
-    #     self,
-    #     trainer: Trainer,
-    #     pl_module: LightningModule,
-    #     outputs: STEP_OUTPUT,
-    #     batch: Any,
-    #     batch_idx: int,
-    #     dataloader_idx: int = 0,
-    # ) -> None:
-    #     super().on_validation_batch_end(
-    #         trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
-    #     )
-    #     self.outputs.extend(outputs)  # num_samples * ([num_atoms_i, 3], [num_atoms_i, num_atom_types])
+    def on_validation_batch_end(
+        self,
+        trainer: Trainer,
+        pl_module: LightningModule,
+        outputs: STEP_OUTPUT,
+        batch: Any,
+        batch_idx: int,
+        dataloader_idx: int = 0,
+    ) -> None:
+        super().on_validation_batch_end(
+            trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
+        )
+        self.outputs.extend(outputs)  # num_samples * ([num_atoms_i, 3], [num_atoms_i, num_atom_types])
 
-    # def on_validation_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
-    #     super().on_validation_start(trainer, pl_module)
-    #     self.outputs = []
+    def on_validation_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        super().on_validation_start(trainer, pl_module)
+        self.outputs = []
 
     def on_validation_epoch_end(
         self, trainer: Trainer, pl_module: LightningModule
@@ -274,27 +280,27 @@ class ValidationCallback(Callback):
         pl_module.log_dict(recon_loss)
         print(json.dumps(recon_loss, indent=4))
 
-        # results, recon_dict = reconstruct_mol_and_filter_invalid(self.outputs)
+        results, recon_dict = reconstruct_mol_and_filter_invalid(self.outputs)
 
-        # if len(results) == 0:
-        #     print('skip validation, no mols are valid & complete')
-        #     return
+        if len(results) == 0:
+            print('skip validation, no mols are valid & complete')
+            return
 
-        # epoch = pl_module.current_epoch
-        # path = os.path.join(pl_module.cfg.accounting.val_outputs_dir, f'epoch_{epoch}')
-        # # clear previous outputs if exists
-        # if os.path.exists(path):
-        #     shutil.rmtree(path)
-        # os.makedirs(path, exist_ok=True)
-        # torch.save(results, os.path.join(path, f'generated.pt'))
+        epoch = pl_module.current_epoch
+        path = os.path.join(pl_module.cfg.accounting.val_outputs_dir, f'epoch_{epoch}')
+        # clear previous outputs if exists
+        if os.path.exists(path):
+            shutil.rmtree(path)
+        os.makedirs(path, exist_ok=True)
+        torch.save(results, os.path.join(path, f'generated.pt'))
         
-        # out_metrics = self.metric.evaluate(results)
-        # torch.save(results, os.path.join(path, f'vina_docked.pt'))
-        # out_metrics.update(recon_dict)
-        # out_metrics = {f'val/{k}': v for k, v in out_metrics.items()}
-        # pl_module.log_dict(out_metrics)
-        # print(json.dumps(out_metrics, indent=4))
-        # json.dump(out_metrics, open(os.path.join(path, 'metrics.json'), 'w'), indent=4)
+        out_metrics = self.metric.evaluate(results)
+        torch.save(results, os.path.join(path, f'vina_docked.pt'))
+        out_metrics.update(recon_dict)
+        out_metrics = {f'val/{k}': v for k, v in out_metrics.items()}
+        pl_module.log_dict(out_metrics)
+        print(json.dumps(out_metrics, indent=4))
+        json.dump(out_metrics, open(os.path.join(path, 'metrics.json'), 'w'), indent=4)
 
 
 class VisualizeMolAndTrajCallback(Callback):
