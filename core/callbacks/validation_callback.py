@@ -99,6 +99,7 @@ def reconstruct_mol_and_filter_invalid(out_list):
                 res['validity'] = validity
                 results.append(res)
         except Exception as e:
+            print(e)
             continue
 
     return results, {

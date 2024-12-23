@@ -4,9 +4,52 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import radius_graph, knn_graph
 from torch_scatter import scatter_softmax, scatter_sum
-
+import torch_scatter
+from time import time
 from core.models.common import GaussianSmearing, MLP, batch_hybrid_edge_connection, outer_product
 
+def multi_radius_graph(x, batch, radii):
+    """
+    根据多个半径阈值从节点坐标和批次信息中生成多级别的边集合。
+    只调用一次 radius_graph，然后根据距离进行分级筛选。
+
+    Args:
+        x (Tensor): 节点坐标, [N, D]
+        batch (LongTensor): 节点的批次信息, [N]
+        radii (list or tuple): 递增顺序的半径列表 (例如 [1.35, 1.7, 2.5])
+
+    Returns:
+        edges_list (list of Tensors): 对应 radii 阈值范围划分的边集列表
+    """
+
+    # 确保 radii 已经排序
+    radii = sorted(radii)
+    r_max = radii[-1]
+
+    # 使用最大半径一次性构建边
+    edge_index_full = radius_graph(x, r=r_max, batch=batch, flow='source_to_target')
+
+    # 计算每条边的距离
+    row, col = edge_index_full
+    # 假设 x 为 (N, D)
+    # 计算欧式距离的平方（避免调用 sqrt 提高性能）
+    diff = x[row] - x[col]
+    dist_sq = (diff * diff).sum(dim=-1)  # dist^2
+
+    # 将半径也转为平方方便比较
+    radii_sq = [r*r for r in radii]
+
+    edges_list = []
+    # 上一个半径区间的上界
+    prev_r_sq = 0.0  
+    for r_sq in radii_sq:
+        # 选取 dist_sq 在 (prev_r_sq, r_sq] 区间内的边
+        # 如果希望第一个区间包括从0到r1的所有边，那么 prev_r_sq可设0
+        mask = (dist_sq <= r_sq) & (dist_sq > prev_r_sq)
+        edges_list.append(edge_index_full[:, mask])
+        prev_r_sq = r_sq
+
+    return edges_list
 def remove_subset_edges(main_edge_index, subset_edge_index):
 # 将边对转换为集合进行操作
     main_edges = set(map(tuple, main_edge_index.t().tolist()))
@@ -394,59 +437,143 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
                 edge_index.append(edges.flip(dims=[1]))
         edge_index = torch.cat(edge_index, dim=0).t().to(device)
         return edge_index
-    def aggregate_to_virtual_center_by_batch(self, h_protein, group_indices, virtual_mask, batch):
-        """
-        将同一批次中的同一簇的真实原子表征聚合到该簇的虚拟中心原子上，使用平均聚合方式。
+    # def aggregate_to_virtual_center_by_batch(self, h_protein, group_indices, virtual_mask, batch):
+    #     """
+    #     将同一批次中的同一簇的真实原子表征聚合到该簇的虚拟中心原子上，使用平均聚合方式。
 
+    #     Args:
+    #         h_protein: 蛋白质特征张量 (N_protein, feature_dim)
+    #         group_indices: 每个原子的簇索引，用于标识各个簇
+    #         virtual_mask: 虚拟原子的掩码，用于区分真实和虚拟原子
+    #         batch: 批次索引，用于区分不同批次的原子 (N_protein,)
+
+    #     Returns:
+    #         updated_h_protein: 更新后的蛋白质特征张量，簇内真实原子特征聚合到虚拟中心原子上
+    #     """
+
+    #     # 初始化更新后的特征张量
+    #     updated_h_protein = h_protein.clone()
+
+    #     # 获取所有批次中的唯一簇索引组合
+    #     unique_batches = torch.unique(batch)
+
+    #     for b in unique_batches:
+    #         # 获取当前批次的原子索引
+    #         batch_mask = (batch == b)
+    #         batch_group_indices = group_indices[batch_mask]
+    #         batch_virtual_mask = virtual_mask[batch_mask]
+    #         batch_h_protein = h_protein[batch_mask]
+
+    #         # 获取当前批次的唯一簇索引
+    #         valid_clusters = torch.unique(batch_group_indices)
+    #         valid_clusters = valid_clusters[valid_clusters != -1]
+
+    #         for cluster in valid_clusters:
+    #             # 获取该簇中的原子索引
+    #             cluster_indices = (batch_group_indices == cluster).nonzero(as_tuple=True)[0]
+
+    #             virtual_center_idx = cluster_indices[batch_virtual_mask[cluster_indices]][0]
+
+    #             # 获取簇内真实原子的索引
+    #             real_atom_indices = cluster_indices[~batch_virtual_mask[cluster_indices]]
+    #             cluster_features_mean = batch_h_protein[real_atom_indices].mean(dim=0)
+    #             updated_h_protein[virtual_center_idx] += cluster_features_mean
+
+    #     return updated_h_protein
+    
+    def _connect_within_batch_optimized(self, x, virtual_mask, batch, mask_ligand):
+        """
+        优化后的函数：建立同一批次中分子与分子、虚拟原子与虚拟原子、分子与虚拟原子之间的连接。
+        
+        所有计算均在 GPU (CUDA) 上进行。
+        
         Args:
-            h_protein: 蛋白质特征张量 (N_protein, feature_dim)
-            group_indices: 每个原子的簇索引，用于标识各个簇
-            virtual_mask: 虚拟原子的掩码，用于区分真实和虚拟原子
-            batch: 批次索引，用于区分不同批次的原子 (N_protein,)
-
+            x: 输入特征张量 (在 GPU 上)
+            virtual_mask: 虚拟原子的掩码 (在 GPU 上)
+            batch: 批次索引，用于区分不同批次的原子 (N_protein,) (在 GPU 上)
+            mask_ligand: 配体掩码，用于区分配体原子 (在 GPU 上)
+        
         Returns:
-            updated_h_protein: 更新后的蛋白质特征张量，簇内真实原子特征聚合到虚拟中心原子上
+            edge_index: 边索引张量，形状为 (2, E)，在 GPU 上
         """
+        device = x.device
+        # 确保所有输入张量都在 GPU 上
+        # 假设在函数外部已经保证 x, virtual_mask, batch, mask_ligand 均在 GPU 上
+        # 如果不确定，可使用以下语句（根据需要取消注释）：
+        # virtual_mask = virtual_mask.to(device)
+        # mask_ligand = mask_ligand.to(device)
+        # batch = batch.to(device)
+        
+        non_protein_mask = virtual_mask | mask_ligand
+        non_protein_indices = torch.where(non_protein_mask)[0]  # 位于 GPU 上
+        
+        # 如果非蛋白原子数量小于等于1，则无需建立边
+        if non_protein_indices.size(0) <= 1:
+            return torch.empty((2, 0), dtype=torch.long, device=device)
+        
+        batch_non_protein = batch[non_protein_indices]  # 在 GPU 上
+        N = batch_non_protein.size(0)
+        
+        # 在 GPU 上生成所有上三角（不含对角线）的索引对
+        idx_i, idx_j = torch.triu_indices(N, N, offset=1, device=device)  # 直接在 GPU 上生成
+        # 筛选出同一批次内的原子对
+        same_batch_mask = (batch_non_protein[idx_i] == batch_non_protein[idx_j])
+        
+        # 获取符合条件的原子索引对
+        selected_idx_i = idx_i[same_batch_mask]
+        selected_idx_j = idx_j[same_batch_mask]
+        
+        edges = torch.stack([
+            non_protein_indices[selected_idx_i], 
+            non_protein_indices[selected_idx_j]
+        ], dim=0)
+        
+        # 生成双向边
+        edges = torch.cat([edges, edges.flip(dims=[0])], dim=1)
+        return edges
+    def aggregate_to_virtual_center_by_batch_optimized(self, h_protein, group_indices, virtual_mask, batch):
+        # 优化版本函数（需要确保 group_indices >= 0 且从0开始计数）
+        valid_mask = group_indices != -1
+        if valid_mask.sum() == 0:
+            return h_protein.clone()
 
-        # 初始化更新后的特征张量
+        combined = batch * (group_indices.max()+1) + group_indices
+        valid_combined = combined[valid_mask]
+        real_mask = valid_mask & ~virtual_mask
+
+        unique_groups, inverse_indices = torch.unique(valid_combined, sorted=True, return_inverse=True)
+        num_unique_groups = unique_groups.size(0)
+
+        real_indices = torch.nonzero(real_mask, as_tuple=False).squeeze(1)
+        real_combined = combined[real_indices]
+        real_inverse = torch.searchsorted(unique_groups, real_combined)
+        real_features = h_protein[real_indices]
+
+        sum_features = torch_scatter.scatter_add(real_features, real_inverse, dim=0, dim_size=num_unique_groups)
+        counts = torch_scatter.scatter_add(torch.ones_like(real_inverse, dtype=torch.float32), real_inverse, dim=0, dim_size=num_unique_groups)
+        group_mean = sum_features / counts.unsqueeze(1).clamp(min=1.0)
+
+        virtual_mask_valid = valid_mask & virtual_mask
+        if virtual_mask_valid.sum() == 0:
+            return h_protein.clone()
+
+        virtual_indices = torch.nonzero(virtual_mask_valid, as_tuple=False).squeeze(1)
+        virtual_combined = combined[virtual_indices]
+        virtual_inverse = torch.searchsorted(unique_groups, virtual_combined)
+
         updated_h_protein = h_protein.clone()
-
-        # 获取所有批次中的唯一簇索引组合
-        unique_batches = torch.unique(batch)
-
-        for b in unique_batches:
-            # 获取当前批次的原子索引
-            batch_mask = (batch == b)
-            batch_group_indices = group_indices[batch_mask]
-            batch_virtual_mask = virtual_mask[batch_mask]
-            batch_h_protein = h_protein[batch_mask]
-
-            # 获取当前批次的唯一簇索引
-            valid_clusters = torch.unique(batch_group_indices)
-            valid_clusters = valid_clusters[valid_clusters != -1]
-
-            for cluster in valid_clusters:
-                # 获取该簇中的原子索引
-                cluster_indices = (batch_group_indices == cluster).nonzero(as_tuple=True)[0]
-
-                virtual_center_idx = cluster_indices[batch_virtual_mask[cluster_indices]][0]
-
-                # 获取簇内真实原子的索引
-                real_atom_indices = cluster_indices[~batch_virtual_mask[cluster_indices]]
-                cluster_features_mean = batch_h_protein[real_atom_indices].mean(dim=0)
-                updated_h_protein[batch_mask][virtual_center_idx] += cluster_features_mean
+        updated_h_protein[virtual_indices] += group_mean[virtual_inverse]
 
         return updated_h_protein
-
     def forward(self, h, x, mask_ligand, batch, virtual_mask, group_indices, return_all=False, fix_x=False):
 
         all_x = [x]
         all_h = [h]
-
+        # t1 = time()
         for b_idx in range(self.num_blocks):
-            h = self.aggregate_to_virtual_center_by_batch(h, group_indices, virtual_mask, batch)
+            h = self.aggregate_to_virtual_center_by_batch_optimized(h, group_indices, virtual_mask, batch)
             #global attention
-            global_edge_index = self._connect_within_batch(x, virtual_mask, batch, mask_ligand)
+            global_edge_index = self._connect_within_batch_optimized(x, virtual_mask, batch, mask_ligand)
             src, dst = global_edge_index
             edge_type = self._build_edge_type(global_edge_index, mask_ligand)
             dist = torch.norm(x[dst] - x[src], p=2, dim=-1, keepdim=True)
@@ -468,11 +595,16 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
             # edge_type_atom = F.one_hot(edge_type_r, num_classes=3)
             
             # 多级边
-            edge_index_2p7 = radius_graph(x, r=1.35, batch=batch, flow='source_to_target')
-            edge_index_3p4 = radius_graph(x, r=1.7, batch=batch, flow='source_to_target')
-            edge_index_4p9 = radius_graph(x, r=2.5, batch=batch, flow='source_to_target')
-            edge_index_4p9 = remove_subset_edges(edge_index_4p9, edge_index_3p4)
-            edge_index_3p4 = remove_subset_edges(edge_index_3p4, edge_index_2p7)
+            # edge_index_2p7 = radius_graph(x, r=1.35, batch=batch, flow='source_to_target')
+            # edge_index_3p4 = radius_graph(x, r=1.7, batch=batch, flow='source_to_target')
+            # edge_index_4p9 = radius_graph(x, r=2.5, batch=batch, flow='source_to_target')
+            # edge_index_4p9 = remove_subset_edges(edge_index_4p9, edge_index_3p4)
+            # edge_index_3p4 = remove_subset_edges(edge_index_3p4, edge_index_2p7)
+            radii = [1.35, 1.7, 2.5]
+            edge_index_levels = multi_radius_graph(x, batch, radii)
+            edge_index_2p7 = edge_index_levels[0]  # 对应半径1.35内的边
+            edge_index_3p4 = edge_index_levels[1]  # 对应半径1.35~1.7区间的边
+            edge_index_4p9 = edge_index_levels[2]  # 对应半径1.7~2.5区间的边
             edge_type_2p7 = torch.full((edge_index_2p7.size(1),), 0, dtype=torch.long, device=edge_index_2p7.device)  # 类型 0
             edge_type_3p4 = torch.full((edge_index_3p4.size(1),), 1, dtype=torch.long, device=edge_index_3p4.device)  # 类型 1
             edge_type_4p9 = torch.full((edge_index_4p9.size(1),), 2, dtype=torch.long, device=edge_index_4p9.device)  # 类型 2
@@ -503,5 +635,7 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
         outputs = {'x': x, 'h': h}
         if return_all:
             outputs.update({'all_x': all_x, 'all_h': all_h})
+        # t2 = time()
+        # print(f"block time: {t2-t1}")
         return outputs
 

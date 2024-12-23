@@ -8,25 +8,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from core.config.config import Struct
-from core.models.common import compose_context, ShiftedSoftplus, compose_context_cross
+from core.models.common import SinusoidalPosEmb, compose_context, ShiftedSoftplus, compose_context_cross
 from core.models.bfn_base import BFNBase
 from core.models.gnn import GNN
+from core.models.gvp import Boundary_Awareness_GNN
 from core.models.uni_transformer import UniTransformerO2TwoUpdateGeneral
 
-
-class SinusoidalPosEmb(nn.Module):
-    def __init__(self, dim):
-        super().__init__()
-        self.dim = dim
-
-    def forward(self, x):
-        device = x.device
-        half_dim = self.dim // 2
-        emb = np.log(10000) / (half_dim - 1)
-        emb = torch.exp(torch.arange(half_dim, device=device) * -emb)
-        emb = x[:, None] * emb[None, :]
-        emb = torch.cat((emb.sin(), emb.cos()), dim=-1)
-        return emb
 
 
 class RBF(nn.Module):
@@ -156,6 +143,7 @@ class BFN4SBDDScoreModel(BFNBase):
         self.destination_prediction = destination_prediction
         self.sampling_strategy = sampling_strategy
         self.GNN = GNN(2, self.hidden_dim, time_emb_dim=self.hidden_dim)
+        #self.GNN = Boundary_Awareness_GNN(num_layers=3)
     def interdependency_modeling(
         self,
         time,

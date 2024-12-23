@@ -49,10 +49,10 @@ def process_molecule_data(save_dir, generated_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process molecule data and save it.")
-    parser.add_argument('--save_dir', type=str, default='/root/project/bfn_mol/results/denovo/office_bfn/saved_data',
-                        help="Directory where results will be saved (default: '/root/project/bfn_mol/results/denovo/bfnmol/saved_data')")
+    parser.add_argument('--save_dir', type=str, default='/root/project/bfn_mol/results/denovo/all_mult_new/saved_data',
+                        help="Directory where results will be saved (default: '/root/project/bfn_mol/results/denovo/all_mult_new/saved_data')")
     parser.add_argument('--generated_file', type=str, 
-                        default='/root/project/bfn_mol/logs/root_bfn_sbdd/office/0/test_outputs/2024-12-8/generated.pt',
+                        default="/root/project/bfn_mol/logs/root_bfn_sbdd/all_mult_new/0/test_outputs_v3/20241220-092053/generated.pt",
                         help="Path to the generated .pt file (default: '/root/project/bfn_mol/logs/root_bfn_sbdd/add_cluster_vert/2/test_outputs_v9/20241206-223130/generated.pt')")
     args = parser.parse_args()
     os.makedirs(args.save_dir, exist_ok=True)

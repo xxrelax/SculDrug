@@ -81,12 +81,12 @@ visual:
 
 
 train:
-  checkpoint: 
+  checkpoint: /root/project/bfn_mol/logs/root_bfn_sbdd/all_mult_gnn/3/checkpoints/epoch02-val_loss5.91-mol_stable0.96-complete0.96-vina_score-7.88.ckpt
   batch_size: !SUB ${batch_size}
   num_workers: 8
   pos_noise_std: !SUB ${pos_noise_std}
   random_rot: !SUB ${random_rot}
-  val_freq: 1000
+  val_freq: 10000
   epochs: !SUB ${epochs}
   resume: !SUB ${resume}
   v_loss_weight: !SUB ${v_loss_weight}

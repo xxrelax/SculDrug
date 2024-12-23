@@ -196,10 +196,10 @@ if __name__ == "__main__":
     parser.add_argument("--test_only", action="store_true")
     
     # global config
-    parser.add_argument('--seed', type=int, default=2025)
+    parser.add_argument('--seed', type=int, default=1024)
     parser.add_argument("--no_wandb", action="store_true")
     parser.add_argument("--logging_level", type=str, default="warning")
-    parser.add_argument("--devices", type=str, default="1", help="Comma-separated list of device IDs (e.g., '0,1,2')")   
+    parser.add_argument("--devices", type=str, default="4", help="Comma-separated list of device IDs (e.g., '0,1,2')")   
     # train data params
     parser.add_argument('--random_rot', action='store_true')
     parser.add_argument("--pos_noise_std", type=float, default=0)    
@@ -207,9 +207,9 @@ if __name__ == "__main__":
     
     # train params
     parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--epochs", type=int, default=15)
+    parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument('--v_loss_weight', type=float, default=1)
-    parser.add_argument('--lr', type=float, default=5e-4)
+    parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--scheduler', type=str, default='plateau', choices=['cosine', 'plateau'])
     parser.add_argument('--weight_decay', type=float, default=0)
     parser.add_argument('--max_grad_norm', type=str, default='Q')  # '8.0' for
@@ -299,10 +299,10 @@ if __name__ == "__main__":
     print(f"The config of this process is:\n{cfg}")
 
     model = SBDDTrainLoop(config=cfg)
-    # if cfg.train.checkpoint:    
-    #     ckpt = torch.load(cfg.train.checkpoint, map_location="cuda")
-    #     model.load_state_dict(ckpt['state_dict'])
-    #     print(f'Successfully load the model! {cfg.train.checkpoint}')
+    if cfg.train.checkpoint:    
+        ckpt = torch.load(cfg.train.checkpoint, map_location="cuda")
+        model.load_state_dict(ckpt['state_dict'])
+        print(f'Successfully load the model! {cfg.train.checkpoint}')
     trainer = pl.Trainer(
         # deterministic=True,
         strategy='ddp_find_unused_parameters_true',

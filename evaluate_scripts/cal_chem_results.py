@@ -172,7 +172,7 @@ def main(root_directory):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Calculate mean chemical properties from chem_eval_results.pt and collect chem_reference_results.pt files.")
-    parser.add_argument("--root_directory", type=str, default='/root/project/bfn_mol/results/denovo/office_bfn/saved_data', help="Root directory containing the method folders")
+    parser.add_argument("--root_directory", type=str, default='/root/project/bfn_mol/results/denovo/all_mult_new/saved_data', help="Root directory containing the method folders")
 
     args = parser.parse_args()
     main(args.root_directory)

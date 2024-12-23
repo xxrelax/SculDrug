@@ -64,12 +64,12 @@ def main(base_result_path, base_pdb_path, exhaustiveness, eval_ref, verbose):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--base_result_path', type=str, default='/root/project/bfn_mol/results/denovo/office_bfn/saved_data', help="Base result path to traverse")
+    parser.add_argument('--base_result_path', type=str, default='/root/project/bfn_mol/results/denovo/all_mult_new/saved_data', help="Base result path to traverse")
     parser.add_argument('--base_pdb_path', type=str, default='/root/project/bfn_mol/data/test_set', help="Base PDB path for constructing pdb_path")
-    parser.add_argument('--exhaustiveness', type=int, default=16, help="Exhaustiveness parameter for Vina docking")
+    parser.add_argument('--exhaustiveness', type=int, default=1, help="Exhaustiveness parameter for Vina docking")
     parser.add_argument('--eval_ref', type=bool, default=True, help="Whether to evaluate the reference ligand")
     parser.add_argument('--verbose', type=eval, default=False, help="Verbose output")
-    parser.add_argument("--seed", type=int, default=1234, help="Random seed")
+    parser.add_argument("--seed", type=int, default=722, help="Random seed")
     args = parser.parse_args()
     seed_everything(args.seed, workers=True)
     main(args.base_result_path, args.base_pdb_path, args.exhaustiveness, args.eval_ref, args.verbose)
