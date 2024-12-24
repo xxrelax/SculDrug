@@ -153,3 +153,5 @@ temp/
 result*/
 data.tar.gz
 denovo/
+.vscode/
+posecheck/

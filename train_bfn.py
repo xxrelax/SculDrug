@@ -38,7 +38,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 def get_dataloader(cfg):
     if cfg.debug:
-        if os.path.exists("./small_data/debug_set.pth") and os.path.exists("./small_data/test_set.pth"):
+        if os.path.exists("./small_data/test_set.pth"):
             train_set = torch.load("./small_data/test_set.pth")
             test_set =  torch.load("./small_data/test_set.pth")
             val_set = test_set
@@ -199,7 +199,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=1024)
     parser.add_argument("--no_wandb", action="store_true")
     parser.add_argument("--logging_level", type=str, default="warning")
-    parser.add_argument("--devices", type=str, default="4", help="Comma-separated list of device IDs (e.g., '0,1,2')")   
+    parser.add_argument("--devices", type=str, default="0", help="Comma-separated list of device IDs (e.g., '0,1,2')")   
     # train data params
     parser.add_argument('--random_rot', action='store_true')
     parser.add_argument("--pos_noise_std", type=float, default=0)    
@@ -367,5 +367,6 @@ if __name__ == "__main__":
     else:
         trainer.test(model, dataloaders=test_loader, ckpt_path=cfg.evaluation.ckpt_path)
 
+# python train_bfn.py --exp_name test_1 --revision 2 --debug
 # python train_bfn.py --config_file configs/default.yaml --exp_name all_mult_edge --revision 2
 # python train_bfn.py --config_file configs/default.yaml --test_only --num_samples 10 --sample_steps 100 --no_wandb --ckpt_path 
