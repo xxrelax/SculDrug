@@ -158,7 +158,7 @@ class SBDDTrainLoop(pl.LightningModule):
             t = torch.clamp(t, min=self.dynamics.t_min)  # clamp t to [t_min,1]
 
         t4 = time()
-        c_loss, d_loss, discretised_loss = self.dynamics.loss_one_step(
+        c_loss, d_loss, discretised_loss, g_loss = self.dynamics.loss_one_step(
             t,
             protein_pos=gt_protein_pos,
             protein_v=protein_v,
@@ -174,7 +174,7 @@ class SBDDTrainLoop(pl.LightningModule):
 
         # here the discretised_loss is close for current version.
 
-        loss = torch.mean(c_loss + self.cfg.train.v_loss_weight * d_loss + discretised_loss)
+        loss = torch.mean(c_loss + self.cfg.train.v_loss_weight * d_loss + discretised_loss + 0.2*g_loss)
 
         t5 = time()
         self.log_dict(
@@ -191,6 +191,7 @@ class SBDDTrainLoop(pl.LightningModule):
                 'loss_pos': c_loss.mean().item(), 
                 'loss_type': d_loss.mean().item(),
                 'loss_c_ratio': c_loss.mean().item() / loss.item(),
+                "loss_g": g_loss.mean().item(),
             },
             on_step=True,
             prog_bar=False,

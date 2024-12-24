@@ -292,7 +292,7 @@ class BFN4SBDDScoreModel(BFNBase):
 
         # TODO: here the preds are reformated.
         # print(coord_pred.shape, p0_h.shape, k_hat.shape)
-        return coord_pred, p0_h, k_hat
+        return coord_pred, pos_ligand_glo, p0_h, k_hat
 
     def reconstruction_loss_one_step(
         self,
@@ -358,7 +358,7 @@ class BFN4SBDDScoreModel(BFNBase):
         # 2. Compute output distribution parameters for p_O (x' | θ; t) (x_hat or k^(d) logits)
         # continuous x ~ δ(x − x_hat(θ, t))
         # discrete k^(d) ~ softmax(Ψ^(d)(θ, t))_k
-        coord_pred, p0_h, k_hat = self.interdependency_modeling(
+        coord_pred, glo_coord, p0_h, k_hat = self.interdependency_modeling(
             time=t,
             protein_pos=protein_pos,
             protein_v=protein_v,
@@ -405,7 +405,8 @@ class BFN4SBDDScoreModel(BFNBase):
                 x=ligand_pos,
                 segment_ids=batch_ligand,
             )
-
+            coord_pred_no_grad = coord_pred.detach()
+            gloss = F.mse_loss(coord_pred_no_grad, glo_coord)
             # closs = self.ctime4continuous_loss(
             #     t=t, sigma1=self.sigma1_coord, x_pred=coord_pred, x=ligand_pos, segment_ids=batch_ligand
             # )  # [B,]
@@ -450,7 +451,7 @@ class BFN4SBDDScoreModel(BFNBase):
         # else:
         discretized_loss = torch.zeros_like(closs)
 
-        return closs, dloss, discretized_loss
+        return closs, dloss, discretized_loss, gloss
 
     def sample(
         self,
@@ -534,7 +535,7 @@ class BFN4SBDDScoreModel(BFNBase):
             # debug only
             # mu_coord_gt, gamma_coord_gt = self.continuous_var_bayesian_update(t, sigma1=self.sigma1_coord, x=ligand_pos)
 
-            coord_pred, p0_h_pred, k_hat = self.interdependency_modeling(
+            coord_pred, glo_coord, p0_h_pred, k_hat = self.interdependency_modeling(
                 time=t,
                 protein_pos=protein_pos,
                 protein_v=protein_v,
@@ -712,7 +713,7 @@ class BFN4SBDDScoreModel(BFNBase):
                 # sample_traj.append((coord_pred, sample_pred,k_hat))
 
         # 5. Compute final output distribution parameters for p_O (x' | θ; t)
-        mu_pos_final, p0_h_final, k_hat_final = self.interdependency_modeling(
+        mu_pos_final,glo_coord, p0_h_final, k_hat_final = self.interdependency_modeling(
             time=torch.ones((n_nodes, 1)).to(self.device)[batch_ligand],
             protein_pos=protein_pos,
             protein_v=protein_v,

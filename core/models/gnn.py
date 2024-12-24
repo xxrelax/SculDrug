@@ -8,6 +8,8 @@ from core.models.common import ConcatSquashLinear, GaussianSmearing, MLP, NONLIN
 from core.models.common import SinusoidalPosEmb
 from torch_geometric.nn import GCNConv
 
+from core.models.gvp import compose_context
+
 class EnBaseLayer(nn.Module):
     def __init__(self, hidden_dim, edge_feat_dim, num_r_gaussian, update_x=True, act_fn='silu', norm=False):
         super().__init__()
@@ -236,19 +238,30 @@ class GNN(nn.Module):
             layers.append(BaseLayer(self.hidden_dim))
         return nn.ModuleList(layers)
 
+    def filter_edges(self, edge_index, mask_ligand):
+        """
+        过滤边，只保留从 surface_pos 到 init_ligand_pos 的边。
+        
+        Args:
+            edge_index: 完整的边索引，形状为 (2, num_edges)。
+            mask_ligand: 掩码，表示哪些节点是配体节点。
+
+        Returns:
+            过滤后的边索引。
+        """
+        src, dst = edge_index
+        valid_mask = (~mask_ligand[src]) & mask_ligand[dst]
+        filtered_edge_index = edge_index[:, valid_mask]
+        return filtered_edge_index
     def forward(self, surface_pos, init_ligand_pos, batch_surface, batch_ligand, time):
-        h_surface = self.surface_pos_encoder(surface_pos)
+        h_surface_pos = self.surface_pos_encoder(surface_pos)
         h_time = self.time_emb(time.squeeze(-1))
         h_ligand_pos = self.ligand_pos_encoder(h_time, init_ligand_pos)
-
-        combined_pos = torch.cat([surface_pos, init_ligand_pos], dim=0)
-        combined_batch = torch.cat([batch_surface, batch_ligand], dim=0)
-        edge_index = knn_graph(combined_pos, k=30, batch=combined_batch)
-
-
-        h_combined = torch.cat([h_surface, h_ligand_pos], dim=0)
+        h_node, pos_all, mask_ligand, batch_all  = compose_context(h_surface_pos, h_ligand_pos, surface_pos, init_ligand_pos, batch_surface, batch_ligand)
+        edge_index = radius_graph(pos_all, 3.5, batch=batch_all, flow='source_to_target')
+        edge_index = self.filter_edges(edge_index, mask_ligand)
         for layer in self.net:
-            h_combined = layer(h_combined, edge_index)
+            h_combined = layer(h_node, edge_index)
 
         mask_ligand = torch.cat(
             [torch.zeros_like(batch_surface, dtype=torch.bool), torch.ones_like(batch_ligand, dtype=torch.bool)]

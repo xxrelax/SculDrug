@@ -202,7 +202,7 @@ class ValidationCallback(Callback):
                         t = torch.clamp(t, min=pl_module.dynamics.t_min)  # clamp t to [t_min,1]
 
                     # compute bfn loss  # TODO: convert to reconstruction loss
-                    c_loss, d_loss, discretised_loss = pl_module.dynamics.reconstruction_loss_one_step(
+                    c_loss, d_loss, discretised_loss, g_loss = pl_module.dynamics.reconstruction_loss_one_step(
                         t,
                         protein_pos=protein_pos,
                         protein_v=protein_v,
@@ -215,7 +215,7 @@ class ValidationCallback(Callback):
                         surface_pos =surface_pos, 
                         batch_surface=batch_surface
                     )
-                    loss = torch.mean(c_loss + pl_module.cfg.train.v_loss_weight * d_loss + discretised_loss)
+                    loss = torch.mean(c_loss + pl_module.cfg.train.v_loss_weight * d_loss + discretised_loss+0.2*g_loss)
                     sum_loss += float(loss) * num_graphs
                     sum_loss_pos += float(c_loss.sum())
                     sum_loss_type += float(d_loss.sum())
@@ -224,6 +224,7 @@ class ValidationCallback(Callback):
                 "val/recon_loss": sum_loss / sum_batches,
                 "val/recon_loss_pos": sum_loss_pos / sum_batches,
                 "val/recon_loss_type": sum_loss_type / sum_batches,
+                "val/recon_loss_g": float(g_loss.sum()) / sum_batches,
             }
             return recon_loss
 
