@@ -582,6 +582,10 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
             e_w = torch.sigmoid(logits)
             for l_idx, layer in enumerate(self.global_block):
                 h, x = layer(h, x, edge_type, global_edge_index, mask_ligand, e_w=e_w, fix_x=fix_x)
+            h = h[~virtual_mask]
+            x = x[~virtual_mask]
+            batch = batch[~virtual_mask]
+            mask_ligand = mask_ligand[~virtual_mask]
             # mask_ligand = mask_ligand[~virtual_mask]
             # radius_list = torch.tensor([2.7, 3.4, 4.9], device="cuda")
             # distance_matrix = torch.cdist(x, x)

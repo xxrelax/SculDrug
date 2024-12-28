@@ -303,6 +303,7 @@ class VinaDockingTask(BaseDockingTask):
             score, pose = dock.dock(score_func='vina', mode=mode, exhaustiveness=exhaustiveness, save_pose=True, **kwargs)
             return {'affinity': score, 'pose': pose}
         except Exception as e:
+            print(e)
             return {'affinity': np.nan, 'pose': 'None'}
 
     # def tmp_run(self, mode='dock', exhaustiveness=8, **kwargs):

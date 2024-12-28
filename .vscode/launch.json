@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["--exp_name", "test_1", "--revision", "2", "--debug"],
+            "args": ["--exp_name", "test_1", "--revision", "2", "--debug", "--devices", "3"],
             "args1": ["--config_file", "configs/default.yaml", "--test_only", "--num_samples", "10", "--sample_steps", "100", "--no_wandb", "--ckpt_path", "/root/project/bfn_mol/logs/root_bfn_sbdd/add_cluster_vert/2/checkpoints/epoch08-val_loss5.74-mol_stable0.98-complete0.98-vina_score-7.08.ckpt"],
             "justMyCode": true
         }

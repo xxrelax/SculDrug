@@ -196,20 +196,20 @@ if __name__ == "__main__":
     parser.add_argument("--test_only", action="store_true")
     
     # global config
-    parser.add_argument('--seed', type=int, default=1024)
+    parser.add_argument('--seed', type=int, default=722)
     parser.add_argument("--no_wandb", action="store_true")
     parser.add_argument("--logging_level", type=str, default="warning")
-    parser.add_argument("--devices", type=str, default="0", help="Comma-separated list of device IDs (e.g., '0,1,2')")   
+    parser.add_argument("--devices", type=str, default="3", help="Comma-separated list of device IDs (e.g., '0,1,2')")   
     # train data params
     parser.add_argument('--random_rot', action='store_true')
     parser.add_argument("--pos_noise_std", type=float, default=0)    
     parser.add_argument("--pos_normalizer", type=float, default=2.0)    
     
     # train params
-    parser.add_argument("--batch_size", type=int, default=4)
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument('--v_loss_weight', type=float, default=1)
-    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--scheduler', type=str, default='plateau', choices=['cosine', 'plateau'])
     parser.add_argument('--weight_decay', type=float, default=0)
     parser.add_argument('--max_grad_norm', type=str, default='Q')  # '8.0' for

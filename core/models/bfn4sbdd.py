@@ -234,7 +234,8 @@ class BFN4SBDDScoreModel(BFNBase):
             outputs["x"],
             outputs["h"],
         )  # shape of the pos and shape of h
-        final_ligand_pos, final_ligand_h = final_pos[mask_ligand], final_h[mask_ligand]
+        final_ligand_pos, final_ligand_h = final_pos[mask_ligand[~virtual_mask]], final_h[mask_ligand[~virtual_mask]]
+        #final_ligand_pos, final_ligand_h = final_pos[mask_ligand], final_h[mask_ligand]
         final_ligand_v = self.v_inference(final_ligand_h)  # [N_ligand, 13]
 
         # TODO: think about equivariance for pos & center of mass
@@ -405,8 +406,17 @@ class BFN4SBDDScoreModel(BFNBase):
                 x=ligand_pos,
                 segment_ids=batch_ligand,
             )
-            coord_pred_no_grad = coord_pred.detach()
-            gloss = F.mse_loss(coord_pred_no_grad, glo_coord)
+            # coord_pred_no_grad = coord_pred.detach()
+            # gloss = F.mse_loss(coord_pred_no_grad, glo_coord)
+            # gloss = F.mse_loss(ligand_pos, glo_coord)
+            gloss = self.dtime4continuous_loss(
+                i=i,
+                N=self.discrete_steps,
+                sigma1=self.sigma1_coord,
+                x_pred=glo_coord,
+                x=ligand_pos,
+                segment_ids=batch_ligand,
+            )
             # closs = self.ctime4continuous_loss(
             #     t=t, sigma1=self.sigma1_coord, x_pred=coord_pred, x=ligand_pos, segment_ids=batch_ligand
             # )  # [B,]

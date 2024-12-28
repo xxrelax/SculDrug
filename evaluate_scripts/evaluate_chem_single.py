@@ -175,7 +175,7 @@ def evaluate_molecules(result_path, pdb_path, verbose=False, eval_ref=True, exha
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', type=eval, default=False)
-    parser.add_argument('--result_path', type=str, default='/root/project/bfn_mol/results/denovo/bfnmol/saved_data/ABL2_HUMAN_274_551_0/4xli_B_rec_4xli_1n1_lig_tt_min_0')
+    parser.add_argument('--result_path', type=str, default='/root/project/bfn_mol/results/denovo/add_loss_single/saved_data/ABL2_HUMAN_274_551_0/4xli_B_rec_4xli_1n1_lig_tt_min_0')
     parser.add_argument('--pdb_path', type=str, default='/root/project/bfn_mol/data/test_set/ABL2_HUMAN_274_551_0/4xli_B_rec.pdb')
     parser.add_argument('--eval_ref', type=bool, default=True)
     parser.add_argument('--exhaustiveness', type=int, default=1)
