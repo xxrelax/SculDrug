@@ -298,6 +298,7 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
 
         self.init_h_emb_layer = self._build_init_h_layer()
         self.base_block, self.inter_cluster_block, self.global_block = self._build_share_blocks()
+        self.aggre_mlp = MLP(128,128,256)
     def __repr__(self):
         return f'UniTransformerO2(num_blocks={self.num_blocks}, num_layers={self.num_layers}, n_heads={self.n_heads}, ' \
                f'act_fn={self.act_fn}, norm={self.norm}, cutoff_mode={self.cutoff_mode}, ew_net_type={self.ew_net_type}, ' \
@@ -552,6 +553,7 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
         sum_features = torch_scatter.scatter_add(real_features, real_inverse, dim=0, dim_size=num_unique_groups)
         counts = torch_scatter.scatter_add(torch.ones_like(real_inverse, dtype=torch.float32), real_inverse, dim=0, dim_size=num_unique_groups)
         group_mean = sum_features / counts.unsqueeze(1).clamp(min=1.0)
+        group_mean = self.aggre_mlp(group_mean)
 
         virtual_mask_valid = valid_mask & virtual_mask
         if virtual_mask_valid.sum() == 0:
