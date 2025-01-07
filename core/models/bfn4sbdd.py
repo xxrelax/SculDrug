@@ -360,17 +360,17 @@ class BFN4SBDDScoreModel(BFNBase):
         # continuous x ~ δ(x − x_hat(θ, t))
         # discrete k^(d) ~ softmax(Ψ^(d)(θ, t))_k
         coord_pred, glo_coord, p0_h, k_hat = self.interdependency_modeling(
-            time=t,
-            protein_pos=protein_pos,
+            time=t,  #0.1011 0.3423
+            protein_pos=protein_pos, # tensor([[ 1.3937,  3.9452,  2.6621],
             protein_v=protein_v,
             batch_protein=batch_protein,
-            theta_h_t=theta,
-            mu_pos_t=mu_coord,
+            theta_h_t=theta, # tensor([[0.0584, 0.1593, 0.0650,  ..., 0.0576, 0.0796, 0.0163],
+            mu_pos_t=mu_coord,  # tensor([[ 1.1951, -0.6237,  0.1753],
             batch_ligand=batch_ligand,
-            gamma_coord=gamma_coord,
+            gamma_coord=gamma_coord, # 0.5079
             virtual_mask = virtual_mask, 
             group_indices_list = group_indices_list,
-            surface_pos = surface_pos,
+            surface_pos = surface_pos,  # tensor([[-2.0327,  2.9033,  7.9072],
             batch_surface = batch_surface
         )  # [N, 3], [N, K], [?]
         # if self.include_charge:

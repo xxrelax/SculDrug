@@ -184,7 +184,8 @@ def get_logger(cfg):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
     # meta
     parser.add_argument("--config_file", type=str, default="configs/default.yaml",)
     parser.add_argument("--exp_name", type=str, default="debug")
@@ -207,7 +208,7 @@ if __name__ == "__main__":
     
     # train params
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument('--v_loss_weight', type=float, default=1)
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--scheduler', type=str, default='plateau', choices=['cosine', 'plateau'])

@@ -255,23 +255,23 @@ class ValidationCallback(Callback):
             )
             print(json.dumps(recon_loss, indent=4))
 
-    def on_validation_batch_end(
-        self,
-        trainer: Trainer,
-        pl_module: LightningModule,
-        outputs: STEP_OUTPUT,
-        batch: Any,
-        batch_idx: int,
-        dataloader_idx: int = 0,
-    ) -> None:
-        super().on_validation_batch_end(
-            trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
-        )
-        self.outputs.extend(outputs)  # num_samples * ([num_atoms_i, 3], [num_atoms_i, num_atom_types])
+    # def on_validation_batch_end(
+    #     self,
+    #     trainer: Trainer,
+    #     pl_module: LightningModule,
+    #     outputs: STEP_OUTPUT,
+    #     batch: Any,
+    #     batch_idx: int,
+    #     dataloader_idx: int = 0,
+    # ) -> None:
+    #     super().on_validation_batch_end(
+    #         trainer, pl_module, outputs, batch, batch_idx, dataloader_idx
+    #     )
+    #     self.outputs.extend(outputs)  # num_samples * ([num_atoms_i, 3], [num_atoms_i, num_atom_types])
 
-    def on_validation_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
-        super().on_validation_start(trainer, pl_module)
-        self.outputs = []
+    # def on_validation_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
+    #     super().on_validation_start(trainer, pl_module)
+    #     self.outputs = []
 
     def on_validation_epoch_end(
         self, trainer: Trainer, pl_module: LightningModule
@@ -282,27 +282,27 @@ class ValidationCallback(Callback):
         pl_module.log_dict(recon_loss)
         print(json.dumps(recon_loss, indent=4))
 
-        results, recon_dict = reconstruct_mol_and_filter_invalid(self.outputs)
+        # results, recon_dict = reconstruct_mol_and_filter_invalid(self.outputs)
 
-        if len(results) == 0:
-            print('skip validation, no mols are valid & complete')
-            return
+        # if len(results) == 0:
+        #     print('skip validation, no mols are valid & complete')
+        #     return
 
-        epoch = pl_module.current_epoch
-        path = os.path.join(pl_module.cfg.accounting.val_outputs_dir, f'epoch_{epoch}')
-        # clear previous outputs if exists
-        if os.path.exists(path):
-            shutil.rmtree(path)
-        os.makedirs(path, exist_ok=True)
-        torch.save(results, os.path.join(path, f'generated.pt'))
+        # epoch = pl_module.current_epoch
+        # path = os.path.join(pl_module.cfg.accounting.val_outputs_dir, f'epoch_{epoch}')
+        # # clear previous outputs if exists
+        # if os.path.exists(path):
+        #     shutil.rmtree(path)
+        # os.makedirs(path, exist_ok=True)
+        # torch.save(results, os.path.join(path, f'generated.pt'))
         
-        out_metrics = self.metric.evaluate(results)
-        torch.save(results, os.path.join(path, f'vina_docked.pt'))
-        out_metrics.update(recon_dict)
-        out_metrics = {f'val/{k}': v for k, v in out_metrics.items()}
-        pl_module.log_dict(out_metrics)
-        print(json.dumps(out_metrics, indent=4))
-        json.dump(out_metrics, open(os.path.join(path, 'metrics.json'), 'w'), indent=4)
+        # out_metrics = self.metric.evaluate(results)
+        # torch.save(results, os.path.join(path, f'vina_docked.pt'))
+        # out_metrics.update(recon_dict)
+        # out_metrics = {f'val/{k}': v for k, v in out_metrics.items()}
+        # pl_module.log_dict(out_metrics)
+        # print(json.dumps(out_metrics, indent=4))
+        # json.dump(out_metrics, open(os.path.join(path, 'metrics.json'), 'w'), indent=4)
 
 
 class VisualizeMolAndTrajCallback(Callback):

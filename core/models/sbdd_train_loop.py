@@ -67,8 +67,10 @@ def center_pos(protein_pos, ligand_pos, batch_protein, batch_ligand, mode="prote
         offset = 0.0
         pass
     elif mode == "protein":
-        offset = scatter_mean(protein_pos, batch_protein, dim=0)
+        offset = scatter_mean(protein_pos, batch_protein, dim=0) # tensor([[14.0434, 17.8929, 51.6457]
         protein_pos = protein_pos - offset[batch_protein]
+        batch_proteintensor_cpu = batch_protein.cpu()
+        torch.save(batch_proteintensor_cpu, './batch_proteintensor2.pt')
         ligand_pos = ligand_pos - offset[batch_ligand]
     else:
         raise NotImplementedError
@@ -113,7 +115,9 @@ class SBDDTrainLoop(pl.LightningModule):
         # protein_element_batch: [N_protein]
 
         t2 = time()
-
+        #sum(batch.protein_pos)
+#tensor([206720.2969, 263387.4688, 760219.3125], device='cuda:3')
+        #
         with torch.no_grad():
             # add noise to protein_pos
             protein_noise = torch.randn_like(protein_pos) * self.cfg.train.pos_noise_std
@@ -136,12 +140,29 @@ class SBDDTrainLoop(pl.LightningModule):
             batch_ligand,
             mode=self.cfg.dynamics.center_pos_mode,
         )  # TODO: ugly
-        
-        surface_pos = surface_pos - offset[batch_surface]
-        transform_matrix = build_local_coordinate_system(gt_protein_pos, batch_protein, offset)
-        gt_protein_pos = torch.matmul(gt_protein_pos.unsqueeze(1), transform_matrix[batch_protein]).squeeze(1)
-        ligand_pos = torch.matmul(ligand_pos.unsqueeze(1), transform_matrix[batch_ligand]).squeeze(1)
-        surface_pos = torch.matmul(surface_pos.unsqueeze(1), transform_matrix[batch_surface]).squeeze(1)
+        # tensor([[ 6.3049, 20.0927, 47.8768],
+        surface_pos = surface_pos - offset[batch_surface] # tensor([[-7.7385,  2.1997, -3.7689],
+#         sum(transform_matrix)
+# tensor([[-7.5741e+00, -1.0321e+01, -2.9235e+01],
+#         [ 1.9786e+00, -2.0772e-01,  3.1158e-02],
+#         [-2.3701e-02, -1.6483e+00,  1.1887e+00]], device='cuda:3')
+        transform_matrix = build_local_coordinate_system(gt_protein_pos, batch_protein, offset) # tensor([[[-0.2852, -0.3520, -0.8915], 
+        #         sum(transform_matrix[batch_protein])
+        # tensor([[ -3484.0942,  -4747.6875, -13447.3213],
+        #         [   600.6031,   -738.0328,    -42.0148],
+        #         [  -635.1982,   -581.0387,    415.1340]], device='cuda:3')
+#         sum(gt_protein_pos)
+# tensor([-0.0220,  0.0368,  0.1392], device='cuda:3')
+#sum(gt_protein_pos)
+# tensor([-0.0224,  0.0320,  0.1251], device='cuda:3')
+#
+        #sum(batch_protein)
+# tensor(228160, device='cuda:3')
+#sum(offset)
+#tensor([ 449.3897,  572.5743, 1652.6633], device='cuda:3')
+        gt_protein_pos = torch.matmul(gt_protein_pos.unsqueeze(1), transform_matrix[batch_protein]).squeeze(1) # tensor([[-0.1629,  3.7592,  3.3262],  # tensor([[ 2.5848,  3.3384,  2.3394],
+        ligand_pos = torch.matmul(ligand_pos.unsqueeze(1), transform_matrix[batch_ligand]).squeeze(1) # tensor([[ 0.5836,  0.0562,  0.2090], # tensor([[ 0.5389,  0.2922,  0.1487], #tensor([[ 0.4619, -0.2212,  0.3162],
+        surface_pos = torch.matmul(surface_pos.unsqueeze(1), transform_matrix[batch_surface]).squeeze(1) # tensor([[-1.1245,  0.3584,  8.4099], tensor([[-1.4966,  4.9915,  7.3254],
         # gt_protein_pos = gt_protein_pos / self.cfg.data.normalizer
 
         t3 = time()
@@ -217,8 +238,9 @@ class SBDDTrainLoop(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        out_data_list = self.shared_sampling_step(batch, batch_idx, sample_num_atoms='ref', desc=f'Val')
-        return out_data_list
+        # out_data_list = self.shared_sampling_step(batch, batch_idx, sample_num_atoms='ref', desc=f'Val')
+        # return out_data_list
+        pass
 
 
     def test_step(self, batch, batch_idx):

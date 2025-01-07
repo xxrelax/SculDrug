@@ -1,7 +1,7 @@
 import os
 import argparse
 import subprocess
-from lightning import seed_everything
+from pytorch_lightning import seed_everything
 from tqdm import tqdm
 import multiprocessing
 from multiprocessing import Pool, cpu_count
