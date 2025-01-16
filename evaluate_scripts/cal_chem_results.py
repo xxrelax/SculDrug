@@ -16,25 +16,24 @@ def collect_chem_results(root_dir):
     validity_list = []
 
     for subdir, dirs, files in os.walk(root_dir):
-        for dir in dirs:
-            chem_eval_file = os.path.join(subdir, dir, 'chem_eval_results.pt')
-            chem_reference_file = os.path.join(subdir, dir,  'chem_reference_results.pt')
+        chem_eval_file = os.path.join(subdir, 'chem_eval_results.pt')
+        chem_reference_file = os.path.join(subdir, 'chem_reference_results.pt')
 
-            if os.path.isfile(chem_eval_file) and os.path.isfile(chem_reference_file):
-                try:
-                    result = torch.load(chem_eval_file)
-                    for res in result:
-                        all_qed.append(res['chem_results']['qed'])
-                        all_logp.append(res['chem_results']['logp'])
-                        all_sa.append(res['chem_results']['sa'])
-                        all_lipinski.append(res['chem_results']['lipinski'])
-                    result_list.append(result)
-                    validity_list.append(len(result) / 200)
+        if os.path.isfile(chem_eval_file) and os.path.isfile(chem_reference_file):
+            try:
+                result = torch.load(chem_eval_file)
+                for res in result:
+                    all_qed.append(res['chem_results']['qed'])
+                    all_logp.append(res['chem_results']['logp'])
+                    all_sa.append(res['chem_results']['sa'])
+                    all_lipinski.append(res['chem_results']['lipinski'])
+                result_list.append(result)
+                validity_list.append(len(result) / 200)
 
-                    ref = torch.load(chem_reference_file)
-                    ref_list.append(ref)
-                except Exception as e:
-                    print(f"Error loading {chem_eval_file} or {chem_reference_file}: {e}")
+                ref = torch.load(chem_reference_file)
+                ref_list.append(ref)
+            except Exception as e:
+                print(f"Error loading {chem_eval_file} or {chem_reference_file}: {e}")
 
     return all_qed, all_logp, all_sa, all_lipinski, result_list, ref_list, validity_list
 
@@ -67,8 +66,8 @@ def calculate_vina_metrics(result, ref, key):
 
     return imp_vina_mean, delta_binding, mean_vina, lig_eff_mean
 
-def main(root_directory):
-    all_qed, all_logp, all_sa, all_lipinski, result_list, ref_list, validity_list = collect_chem_results(root_directory)
+def main(base_result_path):
+    all_qed, all_logp, all_sa, all_lipinski, result_list, ref_list, validity_list = collect_chem_results(base_result_path)
 
     qed_mean, logp_mean, sa_mean, lipinski_mean, validity_mean = calculate_means(all_qed, all_logp, all_sa, all_lipinski, validity_list)
 
@@ -109,49 +108,49 @@ def main(root_directory):
 
     # Print results
     print('Score Only:')
-    print(f"Improvement (%) in Vina Mean: {score_means[0]}")
-    print(f"Delta Binding (%): {score_means[1]}")
-    print(f"Mean Vina: {score_means[2]}")
-    print(f"Ligand Efficiency Mean: {score_means[3]}")
+    print(f"Improvement (MPBG%) in Vina Mean: {score_means[0]}")
+    print(f"Delta Binding (IMP%): {score_means[1]}")
+    print(f"Mean Vina (Evina): {score_means[2]}")
+    print(f"Ligand Efficiency Mean (LBE): {score_means[3]}")
 
     print('Minimize:')
-    print(f"Improvement (%) in Vina Mean: {minimize_means[0]}")
-    print(f"Delta Binding (%): {minimize_means[1]}")
-    print(f"Mean Vina: {minimize_means[2]}")
-    print(f"Ligand Efficiency Mean: {minimize_means[3]}")
+    print(f"Improvement (MPBG%)  in Vina Mean: {minimize_means[0]}")
+    print(f"Delta Binding (IMP%): {minimize_means[1]}")
+    print(f"Mean Vina (Evina): {minimize_means[2]}")
+    print(f"Ligand Efficiency Mean (LBE): {minimize_means[3]}")
 
     print('Dock:')
-    print(f"Improvement (%) in Vina Mean: {dock_means[0]}")
-    print(f"Delta Binding (%): {dock_means[1]}")
-    print(f"Mean Vina: {dock_means[2]}")
-    print(f"Ligand Efficiency Mean: {dock_means[3]}")
+    print(f"Improvement (MPBG%)  in Vina Mean: {dock_means[0]}")
+    print(f"Delta Binding (IMP%): {dock_means[1]}")
+    print(f"Mean Vina (Evina): {dock_means[2]}")
+    print(f"Ligand Efficiency Mean (LBE): {dock_means[3]}")
 
     final_results.update({
         "Score Only": {
-            "Improvement (%) in Vina Mean": score_means[0],
-            "Delta Binding (%)": score_means[1],
-            "Mean Vina": score_means[2],
-            "Ligand Efficiency Mean": score_means[3]
+            "Improvement (MPBG%) in Vina Mean": score_means[0],
+            "Delta Binding (IMP%)": score_means[1],
+            "Mean Vina (Evina)": score_means[2],
+            "Ligand Efficiency Mean (LBE)": score_means[3]
         },
         "Minimize": {
-            "Improvement (%) in Vina Mean": minimize_means[0],
-            "Delta Binding (%)": minimize_means[1],
-            "Mean Vina": minimize_means[2],
-            "Ligand Efficiency Mean": minimize_means[3]
+            "Improvement (MPBG%) in Vina Mean": minimize_means[0],
+            "Delta Binding (IMP%)": minimize_means[1],
+            "Mean Vina (Evina)": minimize_means[2],
+            "Ligand Efficiency Mean (LBE)": minimize_means[3]
         },
         "Dock": {
-            "Improvement (%) in Vina Mean": dock_means[0],
-            "Delta Binding (%)": dock_means[1],
-            "Mean Vina": dock_means[2],
-            "Ligand Efficiency Mean": dock_means[3]
+            "Improvement (MPBG%) in Vina Mean": dock_means[0],
+            "Delta Binding (IMP%)": dock_means[1],
+            "Mean Vina (Evina)": dock_means[2],
+            "Ligand Efficiency Mean (LBE)": dock_means[3]
         }
     })
 
-    method_name_parts = args.root_directory.split('/')
+    method_name_parts = args.base_result_path.split('/')
     method_name = '_'.join(method_name_parts[-1:]) 
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    match = re.search(r'\/results\/([^\/]+\/[^\/]+)', args.root_directory)
+    match = re.search(r'\/results\/([^\/]+\/[^\/]+)', args.base_result_path)
     if match:
         sub_path_parts = match.group(1) + f'_{method_name}'
         output_sub_dir = '/chem_eval_'.join(sub_path_parts.split('/'))
@@ -172,7 +171,7 @@ def main(root_directory):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Calculate mean chemical properties from chem_eval_results.pt and collect chem_reference_results.pt files.")
-    parser.add_argument("--root_directory", type=str, default='/root/project/bfn_mol/results/denovo/all_mult_new/saved_data', help="Root directory containing the method folders")
+    parser.add_argument("--base_result_path", type=str, default='/root/project/bfn_mol/results/denovo/config6/saved_data', help="Root directory containing the method folders")
 
     args = parser.parse_args()
-    main(args.root_directory)
+    main(args.base_result_path)

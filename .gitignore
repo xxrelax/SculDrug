@@ -157,3 +157,11 @@ denovo/
 posecheck/
 test/
 clash/
+.gz
+baseline/
+.pt
+.png
+.tar
+.pt
+posecheck/
+graphbp/

@@ -81,7 +81,7 @@ visual:
 
 
 train:
-  checkpoint: 
+  checkpoint:
   batch_size: !SUB ${batch_size}
   num_workers: 8
   pos_noise_std: !SUB ${pos_noise_std}

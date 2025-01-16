@@ -64,7 +64,7 @@ def main(base_result_path, base_pdb_path, exhaustiveness, eval_ref, verbose):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--base_result_path', type=str, default='/root/project/bfn_mol/results/denovo/all_mult_new/saved_data', help="Base result path to traverse")
+    parser.add_argument('--base_result_path', type=str, default='/root/project/bfn_mol/baseline/results/graphbp/saved_data', help="Base result path to traverse")
     parser.add_argument('--base_pdb_path', type=str, default='/root/project/bfn_mol/data/test_set', help="Base PDB path for constructing pdb_path")
     parser.add_argument('--exhaustiveness', type=int, default=1, help="Exhaustiveness parameter for Vina docking")
     parser.add_argument('--eval_ref', type=bool, default=True, help="Whether to evaluate the reference ligand")

@@ -153,7 +153,7 @@ class ValidationCallback(Callback):
         
         with torch.no_grad():
             pl_module.dynamics.eval()
-            sum_batches, sum_loss, sum_loss_pos, sum_loss_type = 0, 0., 0., 0.
+            sum_batches, sum_loss, sum_loss_pos, sum_loss_type, sum_loss_g = 0, 0., 0., 0., 0.
             pos_normalizer = torch.tensor(
                 pl_module.cfg.data.normalizer_dict.pos, dtype=torch.float32, device=pl_module.device,
             )
@@ -219,12 +219,13 @@ class ValidationCallback(Callback):
                     sum_loss += float(loss) * num_graphs
                     sum_loss_pos += float(c_loss.sum())
                     sum_loss_type += float(d_loss.sum())
+                    sum_loss_g += float(g_loss.sum())
 
             recon_loss = {
                 "val/recon_loss": sum_loss / sum_batches,
                 "val/recon_loss_pos": sum_loss_pos / sum_batches,
                 "val/recon_loss_type": sum_loss_type / sum_batches,
-                "val/recon_loss_g": float(g_loss.sum()) / sum_batches,
+                "val/recon_loss_g": sum_loss_g / sum_batches,
             }
             return recon_loss
 

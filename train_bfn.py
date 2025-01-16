@@ -208,7 +208,7 @@ if __name__ == "__main__":
     
     # train params
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument('--v_loss_weight', type=float, default=1)
     parser.add_argument('--lr', type=float, default=5e-4)
     parser.add_argument('--scheduler', type=str, default='plateau', choices=['cosine', 'plateau'])
@@ -232,11 +232,13 @@ if __name__ == "__main__":
 
     # eval params
     parser.add_argument('--ckpt_path', type=str, default='best', help='path to the checkpoint')
-    parser.add_argument("--num_samples", type=int, default=5)
+    parser.add_argument("--num_samples", type=int, default=10)
     parser.add_argument("--sample_steps", type=int, default=100)
     parser.add_argument('--sample_num_atoms', type=str, default='prior', choices=['prior', 'ref'])
     parser.add_argument("--visual_chain", action="store_true")
     parser.add_argument("--docking_mode", type=str, default="vina_score", choices=['vina_score', 'vina_dock'])
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     _args = parser.parse_args()
     if _args.ckpt_path.lstrip('./') == 'checkpoints/last.ckpt':
@@ -369,5 +371,5 @@ if __name__ == "__main__":
         trainer.test(model, dataloaders=test_loader, ckpt_path=cfg.evaluation.ckpt_path)
 
 # python train_bfn.py --exp_name test_1 --revision 2 --debug
-# python train_bfn.py --config_file configs/default.yaml --exp_name all_mult_edge --revision 2
+# python train_bfn.py --config_file configs/default.yaml --exp_name all_mult_edge --revision 0
 # python train_bfn.py --config_file configs/default.yaml --test_only --num_samples 10 --sample_steps 100 --no_wandb --ckpt_path 

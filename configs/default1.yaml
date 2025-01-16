@@ -32,9 +32,9 @@ dynamics:
   net_config:
       name: "unio2net"
       num_blocks: 1
-      num_layers: 6 #9->6
-      hidden_dim: 128
-      n_heads: 16
+      num_layers: 4 #9->6
+      hidden_dim: 64
+      n_heads: 8
       edge_feat_dim: 4  # edge type feat
       num_r_gaussian: 20
       knn: 32 # !
@@ -86,7 +86,7 @@ train:
   num_workers: 8
   pos_noise_std: !SUB ${pos_noise_std}
   random_rot: !SUB ${random_rot}
-  val_freq: 1000
+  val_freq: 250
   epochs: !SUB ${epochs}
   resume: !SUB ${resume}
   v_loss_weight: !SUB ${v_loss_weight}

@@ -54,7 +54,8 @@ def eval_single_mol(mol_path, save_path, pdb_path, center, exhaustiveness):
                                         save_dir=save_path)
     docking_results = vina_task.run(mode='dock', 
                                     exhaustiveness=exhaustiveness,
-                                    save_dir=save_path)
+                                    save_dir=save_path,
+                                    save_name=os.path.basename(mol_path).split('.')[0])
     
     vina_results = {
         'score_only': score_only_results,
@@ -152,7 +153,11 @@ def evaluate_molecules(result_path, pdb_path, verbose=False, eval_ref=True, exha
 
     # If evaluating reference ligand
     if eval_ref:
-        ref_mol_path = os.path.join(os.path.dirname(pdb_path), os.path.basename(result_path) + '.sdf')
+        if "pocket10" in result_path:
+            ref_result_path = result_path[:-9]
+        else:
+            ref_result_path = result_path
+        ref_mol_path = os.path.join(os.path.dirname(pdb_path), os.path.basename(ref_result_path) + '.sdf')
         ref_result = eval_single_mol(ref_mol_path, dock_result_path, pdb_path, center, exhaustiveness)
         torch.save(ref_result, os.path.join(result_path, 'chem_reference_results.pt'))
         logger.info('Reference ligand evaluation done!')
@@ -175,11 +180,11 @@ def evaluate_molecules(result_path, pdb_path, verbose=False, eval_ref=True, exha
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', type=eval, default=False)
-    parser.add_argument('--result_path', type=str, default='/root/project/bfn_mol/results/denovo/add_loss_single/saved_data/ABL2_HUMAN_274_551_0/4xli_B_rec_4xli_1n1_lig_tt_min_0')
+    parser.add_argument('--result_path', type=str, default='/root/project/bfn_mol/baseline/graphbp/save_data/ABL2_HUMAN_274_551_0/4xli_B_rec_4xli_1n1_lig_tt_min_0_pocket10')
     parser.add_argument('--pdb_path', type=str, default='/root/project/bfn_mol/data/test_set/ABL2_HUMAN_274_551_0/4xli_B_rec.pdb')
     parser.add_argument('--eval_ref', type=bool, default=True)
-    parser.add_argument('--exhaustiveness', type=int, default=1)
+    parser.add_argument('--exhaustiveness', type=int, default=16)
     parser.add_argument('--center', type=float, nargs=3, default=None,
                         help='Center of the pocket bounding box, in format x,y,z') # [4.35 , 3.75, 3.16] for adrb1  [1.30, -3.75, -1.90] for drd3
     args = parser.parse_args()
-    evaluate_molecules(args.result_path, args.pdb_path, args.exhaustiveness, args.eval_ref, args.verbose)
+    evaluate_molecules(args.result_path, args.pdb_path, exhaustiveness=args.exhaustiveness, eval_ref = args.eval_ref, verbose = args.verbose)

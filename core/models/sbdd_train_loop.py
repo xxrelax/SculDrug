@@ -238,7 +238,7 @@ class SBDDTrainLoop(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        # out_data_list = self.shared_sampling_step(batch, batch_idx, sample_num_atoms='ref', desc=f'Val')
+        # out_data_list = self.shared_sampling_step(batch, batch_idx, sample_num_atoms='prior', desc=f'Val')
         # return out_data_list
         pass
 

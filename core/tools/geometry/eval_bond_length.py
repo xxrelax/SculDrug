@@ -56,7 +56,7 @@ def get_bond_length_profile(bond_lengths: Sequence[BondLengthData]) -> BondLengt
 
 def _bond_type_str(bond_type: BondType) -> str:
     atom1, atom2, bond_category = bond_type
-    return f'{atom1}{get_bond_str(bond_category)}{atom2}'
+    return f'{atom1}-{atom2}|{bond_category}'
 
 
 def eval_bond_length_profile(bond_length_profile: BondLengthProfile) -> Dict[str, Optional[float]]:

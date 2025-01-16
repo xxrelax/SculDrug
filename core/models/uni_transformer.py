@@ -298,7 +298,7 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
 
         self.init_h_emb_layer = self._build_init_h_layer()
         self.base_block, self.inter_cluster_block, self.global_block = self._build_share_blocks()
-        self.aggre_mlp = MLP(128,128,256)
+        self.aggre_mlp = MLP(self.hidden_dim,self.hidden_dim,2*self.hidden_dim)
     def __repr__(self):
         return f'UniTransformerO2(num_blocks={self.num_blocks}, num_layers={self.num_layers}, n_heads={self.n_heads}, ' \
                f'act_fn={self.act_fn}, norm={self.norm}, cutoff_mode={self.cutoff_mode}, ew_net_type={self.ew_net_type}, ' \
