@@ -69,8 +69,6 @@ def center_pos(protein_pos, ligand_pos, batch_protein, batch_ligand, mode="prote
     elif mode == "protein":
         offset = scatter_mean(protein_pos, batch_protein, dim=0) # tensor([[14.0434, 17.8929, 51.6457]
         protein_pos = protein_pos - offset[batch_protein]
-        batch_proteintensor_cpu = batch_protein.cpu()
-        torch.save(batch_proteintensor_cpu, './batch_proteintensor2.pt')
         ligand_pos = ligand_pos - offset[batch_ligand]
     else:
         raise NotImplementedError
