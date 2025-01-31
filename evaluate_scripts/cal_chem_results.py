@@ -66,8 +66,8 @@ def calculate_vina_metrics(result, ref, key):
 
     return imp_vina_mean, delta_binding, mean_vina, lig_eff_mean
 
-def main(base_result_path):
-    all_qed, all_logp, all_sa, all_lipinski, result_list, ref_list, validity_list = collect_chem_results(base_result_path)
+def main(root_directory):
+    all_qed, all_logp, all_sa, all_lipinski, result_list, ref_list, validity_list = collect_chem_results(root_directory)
 
     qed_mean, logp_mean, sa_mean, lipinski_mean, validity_mean = calculate_means(all_qed, all_logp, all_sa, all_lipinski, validity_list)
 
@@ -146,16 +146,16 @@ def main(base_result_path):
         }
     })
 
-    method_name_parts = args.base_result_path.split('/')
+    method_name_parts = args.root_directory.split('/')
     method_name = '_'.join(method_name_parts[-1:]) 
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    match = re.search(r'\/results\/([^\/]+\/[^\/]+)', args.base_result_path)
+    match = re.search(r'\/results\/([^\/]+\/[^\/]+)', args.root_directory)
     if match:
         sub_path_parts = match.group(1) + f'_{method_name}'
         output_sub_dir = '/chem_eval_'.join(sub_path_parts.split('/'))
     else:
-        raise ValueError("The base_result_path does not contain the expected pattern after 'results/'")
+        raise ValueError("The root_directory does not contain the expected pattern after 'results/'")
 
     json_dir = './'
     os.makedirs(json_dir, exist_ok=True)
@@ -171,7 +171,7 @@ def main(base_result_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Calculate mean chemical properties from chem_eval_results.pt and collect chem_reference_results.pt files.")
-    parser.add_argument("--base_result_path", type=str, default='/root/project/bfn_mol/results/denovo/config6/saved_data', help="Root directory containing the method folders")
+    parser.add_argument("--root_directory", type=str, default='/root/project/bfn_mol/results/denovo/config/saved_data', help="Root directory containing the method folders")
 
     args = parser.parse_args()
-    main(args.base_result_path)
+    main(args.root_directory)

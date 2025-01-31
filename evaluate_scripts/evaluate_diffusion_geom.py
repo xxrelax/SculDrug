@@ -68,7 +68,7 @@ def find_result_pt_files(directory):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--sample_path', type=str, default="/root/project/bfn_mol/baseline/results/graphbp")
+    parser.add_argument('--sample_path', type=str, default="/root/project/bfn_mol/results/denovo/K_32")
     parser.add_argument('--verbose', type=eval, default=False)
     parser.add_argument('--eval_step', type=int, default=-1)
     parser.add_argument('--eval_num_examples', type=int, default=None)

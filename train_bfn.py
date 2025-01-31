@@ -46,22 +46,21 @@ def get_dataloader(cfg):
             dataset, subsets = get_dataset(config=cfg.data)
             train_set, test_set = subsets['train'], subsets['test']      
             train_indices = list(range(min(len(train_set), 50)))
-            test_indices = list(range(min(len(test_set), 10)))
             train_set = torch.utils.data.Subset(train_set, train_indices)
             val_set = test_set
             torch.save(train_set, "./small_data/debug_set.pth")
             torch.save(test_set, "./small_data/test_set.pth")
-    elif cfg.test_only:
-            test_set = torch.load("./small_data/test_set.pth")
-            train_set = test_set
-            val_set = test_set
+    # elif cfg.test_only:
+    #         test_set = torch.load("./small_data/test_set.pth")
+    #         train_set = test_set
+    #         val_set = test_set
     else:
         if cfg.data.name == 'pl_tr':
             dataset, subsets = get_dataset(config=cfg.data)
             train_set, test_set = subsets['train'], subsets['test']        
             cfg.dynamics.protein_atom_feature_dim = dataset.protein_atom_feature_dim
             cfg.dynamics.ligand_atom_feature_dim = dataset.ligand_atom_feature_dim
-            torch.save(test_set, "./small_data/test_set.pth")
+            # torch.save(test_set, "./small_data/test_set.pth")
         else:
             protein_featurizer = trans.FeaturizeProteinAtom()
             ligand_featurizer = trans.FeaturizeLigandAtom(cfg.data.transform.ligand_atom_mode)
@@ -197,7 +196,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_only", action="store_true")
     
     # global config
-    parser.add_argument('--seed', type=int, default=722)
+    parser.add_argument('--seed', type=int, default=1234)
     parser.add_argument("--no_wandb", action="store_true")
     parser.add_argument("--logging_level", type=str, default="warning")
     parser.add_argument("--devices", type=str, default="3", help="Comma-separated list of device IDs (e.g., '0,1,2')")   

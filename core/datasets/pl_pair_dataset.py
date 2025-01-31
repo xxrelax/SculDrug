@@ -1,6 +1,8 @@
+from functools import partial
 import os
 import pickle
 import lmdb
+import numpy as np
 from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 import sys
@@ -11,7 +13,7 @@ from torch_geometric.transforms import Compose
 
 from core.datasets.utils import PDBProtein, parse_sdf_file, ATOM_FAMILIES_ID
 from core.datasets.pl_data import ProteinLigandData, torchify_dict
-
+from sklearn.cluster import KMeans
 import core.utils.transforms as trans
 
 
@@ -302,7 +304,7 @@ class PocketLigandPairDatasetFeaturized(Dataset):
 
         self.transformed_path = os.path.join(
             os.path.dirname(self.raw_path), os.path.basename(self.raw_path) + 
-            f'_{ligand_atom_mode}_transformed_addVert_{version}.pt'
+            f'_{ligand_atom_mode}_transformed_addVert_batch32_{version}.pt'
         )
         if not os.path.exists(self.transformed_path):
             print(f'{self.transformed_path} does not exist, begin transforming data')
@@ -345,24 +347,9 @@ class PocketLigandPairDatasetFeaturized(Dataset):
             n_clusters = max(1, num_points // atoms_per_cluster)
 
         # 使用 k-means++ 初始化
-        cluster_centers = self.kmeans_plus_plus_init(protein_pos, n_clusters)
-        
-        prev_group_indices = torch.zeros(num_points, dtype=torch.long, device=device)
-        for _ in range(100):
-            distances = torch.cdist(protein_pos, cluster_centers)
-            group_indices = distances.argmin(dim=1)
-            
-            if torch.equal(group_indices, prev_group_indices):
-                break
-            
-            prev_group_indices = group_indices.clone()
-
-            for i in range(n_clusters):
-                cluster_points = protein_pos[group_indices == i]
-                if cluster_points.size(0) > 0:
-                    cluster_centers[i] = cluster_points.mean(dim=0)
-                    
-        # 更新 group_indices_list
+        kmeans = KMeans(n_clusters=n_clusters, init='k-means++', n_init=5, max_iter=100, random_state=1234)
+        cluster_centers = kmeans.fit(protein_pos.cpu().numpy()).cluster_centers_
+        group_indices = torch.tensor(kmeans.labels_, device=device)
         group_indices_list = group_indices
         
         # 计算虚拟节点位置、特征和元素
@@ -380,19 +367,13 @@ class PocketLigandPairDatasetFeaturized(Dataset):
                 virtual_nodes_element.append(virtual_element)
                 virtual_nodes_group_indices.append(i)
 
-        if virtual_nodes_pos:
-            virtual_nodes_pos = torch.stack(virtual_nodes_pos)
-            virtual_nodes_feature = torch.stack(virtual_nodes_feature)
-            virtual_nodes_element = torch.stack(virtual_nodes_element)  # 将虚拟元素转换为张量
-            virtual_nodes_group_indices = torch.tensor(virtual_nodes_group_indices, dtype=torch.long, device=device)
-            
-            extended_protein_pos_list.append(virtual_nodes_pos)
-            extended_protein_atom_feature_list.append(virtual_nodes_feature)
-            extended_protein_element_list.append(virtual_nodes_element)  # 添加虚拟元素到扩展列表
-            virtual_mask_list.append(torch.ones(len(virtual_nodes_pos), dtype=torch.bool, device=device))
-            group_indices_list = torch.cat([group_indices_list, virtual_nodes_group_indices], dim=0)
+        extended_protein_pos_list.append(torch.stack(virtual_nodes_pos))
+        extended_protein_atom_feature_list.append(torch.stack(virtual_nodes_feature))
+        extended_protein_element_list.append(torch.stack(virtual_nodes_element))
+        virtual_mask_list.append(torch.ones(len(virtual_nodes_pos), dtype=torch.bool, device=device))  # 虚拟节点标记为 1
+        group_indices_list = torch.cat([group_indices_list, torch.tensor(virtual_nodes_group_indices, dtype=torch.long, device=device)])
 
-        # 合并位置、特征、元素和虚拟掩码
+        # 将原始数据和虚拟节点数据整合
         extended_protein_pos = torch.cat(extended_protein_pos_list, dim=0)
         extended_protein_atom_feature = torch.cat(extended_protein_atom_feature_list, dim=0)
         extended_protein_element = torch.cat(extended_protein_element_list, dim=0)
@@ -434,8 +415,17 @@ class PocketLigandPairDatasetFeaturized(Dataset):
                 for k in self.features_to_save:
                     tr_data[k] = getattr(data, k)
                 tr_data["protein_pos"], tr_data["protein_atom_feature"], tr_data["protein_element"], tr_data["virtual_mask"], tr_data["group_indices_list"]= \
-                    self.create_virtual_nodes_per_batch(tr_data["protein_pos"], tr_data["protein_atom_feature"], tr_data["protein_element"], atoms_per_cluster=8)
+                    self.create_virtual_nodes_per_batch(tr_data["protein_pos"], tr_data["protein_atom_feature"], tr_data["protein_element"], atoms_per_cluster=64)
                 tr_data['id'] = idx
+                base_path = "/root/project/bfn_mol/data/crossdocked_v1.1_rmsd1.0_pocket10"
+                vert_path = os.path.join(base_path, tr_data["protein_filename"][:-4]+"_down.vert")
+                with open(vert_path, 'r') as file:
+                    surface_pos = file.readlines()
+    
+                # 转换为numpy数组并转换为张量
+                data_array = np.array([list(map(float, line.split())) for line in surface_pos])
+                surface_pos_tensor = torch.tensor(data_array, dtype=torch.float32)
+                tr_data["surface_pos"] = surface_pos_tensor
                 tr_data = ProteinLigandData(**tr_data)
                 data_list.append(tr_data)
                 # if i>10:

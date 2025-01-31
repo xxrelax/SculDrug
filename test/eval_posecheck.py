@@ -1,13 +1,15 @@
 import os
 from rdkit import Chem
 import torch
-import glob
+from glob import glob
 import pandas as pd
 import numpy as np
 import contextlib
 from tqdm import tqdm
 from posecheck import PoseCheck
 from rdkit.Chem.QED import qed
+import sys
+sys.path.append("/root/project/bfn_mol/")
 from core.evaluation.utils.sascorer import compute_sa_score
 import argparse
 
@@ -16,7 +18,10 @@ pdb_proteins = {}
 molist = []
 show_global = False
 pc = PoseCheck()
-
+def find_result_pt_files(directory):
+    result_pt_files = glob(os.path.join(directory,"**", '*.sdf'), recursive=True)
+    result_pt_files = [file for file in result_pt_files if 'docking_results' not in file]
+    return result_pt_files
 def supress_stdout(func):
     def wrapper(*a, **ka):
         with open(os.devnull, 'w') as devnull:
@@ -111,18 +116,20 @@ def get_hbond(mol, protein_root):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--mol_dir', type=str)
-    parser.add_argument('--protein_root', type=str, default='./data/test_set')
+    parser.add_argument('--mol_dir', type=str,default='/root/project/bfn_mol/results/denovo/K_32/')
+    #parser.add_argument('--protein_root', type=str, default='/root/project/bfn_mol/data/crossdocked_test')
+    parser.add_argument('--protein_root', type=str, default='/root/project/bfn_mol/data/test_set')
     args = parser.parse_args()
 
     mol_dirs = [args.mol_dir]
     ligand_fn = None
     for mol_dir in mol_dirs:
-        mol_fns = glob.glob(f"{mol_dir.rstrip('/')}/*.sdf")
-        if 'diff' in mol_dir or 'flag' in mol_dir:
-            mol_fns = sorted(mol_fns, key=lambda x: int(os.path.basename(x).split('.')[0]))
-        else:
-            mol_fns = sorted(mol_fns, key=lambda x: int(os.path.basename(x).split('.')[0]) % 100)
+        base_result_path = os.path.join(mol_dir, "saved_data")
+        mol_fns = find_result_pt_files(base_result_path)
+        # if 'diff' in mol_dir or 'flag' in mol_dir:
+        #     mol_fns = sorted(mol_fns, key=lambda x: int(os.path.basename(x).split('.')[0]))
+        # else:
+        #     mol_fns = sorted(mol_fns, key=lambda x: int(os.path.basename(x).split('.')[0]) % 100)
         vina_scores = []
         vina_mins = []
         vina_docks = []
@@ -135,42 +142,57 @@ def main():
         hbond_donors = []
 
         # latest_time = os.path.getctime(f'{mol_dir}/968.sdf')
-        for mol_fn in tqdm(mol_fns, total=len(mol_fns), desc=os.path.basename(mol_dir)):
-            os.makedirs(mol_dir + '_out', exist_ok=True)
-
-            # use sdf supplier
-            suppl = Chem.SDMolSupplier(mol_fn, removeHs=False)
-            mol = suppl[0]
-            molist.append(mol)
-
-            idx = int(os.path.basename(mol_fn).split('.')[0])
-
-            if os.path.exists(f'{mol_dir}_out/{idx}.sdf'): continue
-            if mol is None: continue
+        for idx_fold, mol_fn in tqdm(enumerate(mol_fns), total=len(mol_fns), desc=os.path.basename(mol_dir)):
+            os.makedirs(mol_dir + '/posecheck', exist_ok=True)
 
             try:
-                if not mol.HasProp('vina_score'): continue
+                suppl = Chem.SDMolSupplier(mol_fn, removeHs=False)
+                mol = suppl[0]
+                if mol is None:
+                    continue
+                molist.append(mol)
+
+                idx = os.path.basename(mol_fn).split('.')[0]
+
+                if os.path.exists(f'{mol_dir}/posecheck/{idx_fold}_{idx}.sdf'): continue
+                if mol is None: continue
+            except (OSError, IOError) as e:
+                print(f'File error at {mol_fn}: {e}')
+                continue
+            # 捕获重构错误
+            except Exception as e:
+                print(e, idx)
+                continue
+
+            try:
+                # if not mol.HasProp('vina_score'): continue
                 smiles = Chem.MolToSmiles(mol)
                 if '.' in smiles: continue
                 # if mol is None or not mol.HasProp('vina_score'): continue
                 
                 # record vina affinities
-                vina_scores.append(float(mol.GetProp('vina_score')))
-                if mol.HasProp('vina_minimize'):
-                    vina_mins.append(float(mol.GetProp('vina_minimize')))
-                elif mol.HasProp('vina_min'):
-                    vina_mins.append(float(mol.GetProp('vina_min')))
-                if mol.HasProp('vina_dock'): vina_docks.append(float(mol.GetProp('vina_dock')))
+                # vina_scores.append(float(mol.GetProp('vina_score')))
+                # if mol.HasProp('vina_minimize'):
+                #     vina_mins.append(float(mol.GetProp('vina_minimize')))
+                # elif mol.HasProp('vina_min'):
+                #     vina_mins.append(float(mol.GetProp('vina_min')))
+                # if mol.HasProp('vina_dock'): vina_docks.append(float(mol.GetProp('vina_dock')))
                 
                 # calculate & record clash and strain
-                if mol.GetProp('_Name') != ligand_fn:
-                    ligand_fn = mol.GetProp('_Name')
-                    protein_fn = os.path.join(
-                        args.protein_root,
-                        os.path.dirname(ligand_fn),
-                        os.path.basename(ligand_fn)[:10] + '.pdb'
-                    )
-                    pc.load_protein_from_pdb(protein_fn)
+                relative_path = os.path.relpath(mol_fn, base_result_path)
+                pdb_file = '/'.join([relative_path.split('/')[0], '_'.join(relative_path.split('/')[1].split('_')[:3])])
+                protein_fn = os.path.join(args.protein_root, pdb_file + ".pdb")
+                # pdb_file = '/'.join([relative_path.split('/')[0], '_'.join(relative_path.split('/')[1].split('_'))])
+
+                # protein_fn = os.path.join(args.protein_root, pdb_file +"_pocket10" + ".pdb")
+                # if mol.GetProp('_Name') != ligand_fn:
+                #     ligand_fn = mol.GetProp('_Name')
+                #     protein_fn = os.path.join(
+                #         args.protein_root,
+                #         os.path.dirname(ligand_fn),
+                #         os.path.basename(ligand_fn)[:10] + '.pdb'
+                #     )
+                pc.load_protein_from_pdb(protein_fn)
                 pc.load_ligands_from_mols([mol])
                 clash = pc.calculate_clashes()[0]
                 strain = pc.calculate_strain_energy()[0]
@@ -196,18 +218,18 @@ def main():
                 # hbond_acceptors.append(hb_acceptor_count)
                 # hbond_donors.append(hb_donor_count)
 
-                with Chem.SDWriter(f'{mol_dir}_out/{idx}.sdf') as w:
+                with Chem.SDWriter(f'{mol_dir}/posecheck/{idx_fold}_{idx}.sdf') as w:
                     w.write(mol)
 
             except Exception as e:
-                print(e, idx)
+                print(e, mol_fn)
                 continue
 
         print('file', mol_dir)
-        if len(vina_scores) == 0: continue
-        print('vina_score', np.mean(vina_scores), np.median(vina_scores), np.std(vina_scores))
-        print('vina_min', np.mean(vina_mins), np.median(vina_mins), np.std(vina_mins))
-        if vina_docks: print('vina_dock', np.mean(vina_docks), np.median(vina_docks), np.std(vina_docks))
+        # if len(vina_scores) == 0: continue
+        # print('vina_score', np.mean(vina_scores), np.median(vina_scores), np.std(vina_scores))
+        # print('vina_min', np.mean(vina_mins), np.median(vina_mins), np.std(vina_mins))
+        # if vina_docks: print('vina_dock', np.mean(vina_docks), np.median(vina_docks), np.std(vina_docks))
         if clashes: print('clash', np.mean(clashes), np.median(clashes), np.std(clashes))
 
         if strain_energies: print('strain', np.quantile(strain_energies, 0.25), np.median(strain_energies), np.quantile(strain_energies, 0.75), np.std(strain_energies))
@@ -216,3 +238,5 @@ def main():
         print('size', np.mean(sizes), np.median(sizes), np.std(sizes))
         # print('hbond_acceptors', sum(hbond_acceptors) / len(hbond_acceptors))
         # print('hbond_donors', sum(hbond_donors) / len(hbond_donors))
+if __name__ == '__main__':
+    main()
