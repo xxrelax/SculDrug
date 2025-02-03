@@ -304,7 +304,7 @@ class PocketLigandPairDatasetFeaturized(Dataset):
 
         self.transformed_path = os.path.join(
             os.path.dirname(self.raw_path), os.path.basename(self.raw_path) + 
-            f'_{ligand_atom_mode}_transformed_addVert_batch32_{version}.pt'
+            f'_{ligand_atom_mode}_transformed_addVert_batch8_{version}.pt'
         )
         if not os.path.exists(self.transformed_path):
             print(f'{self.transformed_path} does not exist, begin transforming data')
