@@ -6,9 +6,6 @@ from torch_geometric.utils import scatter
 from math import pi
 from core.models.common import MLP, ConcatSquashLinear, GaussianSmearing, compose_context_cross , SinusoidalPosEmb
 def compose_context(h_surface, h_ligand_pos, surface_pos, init_ligand_pos, batch_surface, batch_ligand):
-    """
-    将表面和配体的几何信息组合到一起，生成统一的上下文特征和位置数据。
-    """
     batch_all = torch.cat([batch_surface, batch_ligand], dim=0)
     sort_idx = torch.argsort(batch_all, stable=True)  
 
@@ -96,16 +93,6 @@ class Boundary_Awareness_GNN(nn.Module):
         self.convs = nn.ModuleList([copy.deepcopy(GraphNetsConv(64, 64)) for _ in range(self.num_layers)])
         self.position_mlp = MLP(pos_dim, 3, pos_dim)
     def filter_edges(self, edge_index, mask_ligand):
-        """
-        过滤边，只保留从 surface_pos 到 init_ligand_pos 的边。
-        
-        Args:
-            edge_index: 完整的边索引，形状为 (2, num_edges)。
-            mask_ligand: 掩码，表示哪些节点是配体节点。
-
-        Returns:
-            过滤后的边索引。
-        """
         src, dst = edge_index
         valid_mask = (~mask_ligand[src]) & mask_ligand[dst]
         filtered_edge_index = edge_index[:, valid_mask]

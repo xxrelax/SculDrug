@@ -18,39 +18,24 @@ import core.utils.transforms as trans
 from core.utils.train import get_optimizer, get_scheduler
 
 def build_local_coordinate_system(atom_positions, batch_indices, offset):
-    """
-    针对不同 batch 的分子构建局部坐标系。
-    
-    Args:
-        atom_positions: 原子的坐标张量，shape=(N, 3)，包含所有分子的原子。
-        batch_indices: 每个原子所属的 batch，shape=(N,)。
-        
-    Returns:
-        transform_matrices: 每个 batch 的局部坐标系变换矩阵，shape=(B, 3, 3)。
-        offset: 每个 batch 的局部坐标系原点（质心），shape=(B, 3)。
-    """
-    # Step 1: 计算每个 batch 的质心
     batch_size = batch_indices.max() + 1
     expanded_offsets = offset[batch_indices]
     distances = torch.norm(atom_positions - expanded_offsets, dim=1) 
-    sorted_indices = torch.argsort(distances)  # 按距离排序
-    sorted_batch_indices = batch_indices[sorted_indices]  # 对应 batch 排序
+    sorted_indices = torch.argsort(distances)  
+    sorted_batch_indices = batch_indices[sorted_indices]  
 
-    # 利用分组方式找到每个 batch 中的前两个最近原子
     unique_batches, inverse_indices, counts = torch.unique(sorted_batch_indices, return_inverse=True, return_counts=True)
     cumsum_counts = torch.cumsum(counts, dim=0)
-    starts = torch.cat([torch.tensor([0], device=cumsum_counts.device), cumsum_counts[:-1]])  # 每个 batch 的起点索引
+    starts = torch.cat([torch.tensor([0], device=cumsum_counts.device), cumsum_counts[:-1]])  
 
-    # 获取前两个原子索引
     nearest_indices = torch.stack([
-        sorted_indices[starts + 1],  # 最近的第一个原子
-        sorted_indices[starts + 2]  # 最近的第二个原子
+        sorted_indices[starts + 1], 
+        sorted_indices[starts + 2]  
     ], dim=1)
 
-    # Step 4: 构建局部坐标系
-    pos_A = offset  # 质心
-    pos_B = atom_positions[nearest_indices[:, 0]]  # 最近的第一个原子
-    pos_C = atom_positions[nearest_indices[:, 1]]  # 最近的第二个原子
+    pos_A = offset  
+    pos_B = atom_positions[nearest_indices[:, 0]] 
+    pos_C = atom_positions[nearest_indices[:, 1]]  
 
     x_axis = (pos_B - pos_A) / torch.norm(pos_B - pos_A, dim=1, keepdim=True)
     temp_vector = (pos_C - pos_A)
@@ -129,7 +114,6 @@ class SBDDTrainLoop(pl.LightningModule):
                 ligand_pos = ligand_pos @ Q
 
         num_graphs = batch_protein.max().item() + 1
-        # !!!!!
         
         gt_protein_pos, ligand_pos, offset = center_pos(
             gt_protein_pos,
@@ -137,43 +121,23 @@ class SBDDTrainLoop(pl.LightningModule):
             batch_protein,
             batch_ligand,
             mode=self.cfg.dynamics.center_pos_mode,
-        )  # TODO: ugly
-        # tensor([[ 6.3049, 20.0927, 47.8768],
-        surface_pos = surface_pos - offset[batch_surface] # tensor([[-7.7385,  2.1997, -3.7689],
-#         sum(transform_matrix)
-# tensor([[-7.5741e+00, -1.0321e+01, -2.9235e+01],
-#         [ 1.9786e+00, -2.0772e-01,  3.1158e-02],
-#         [-2.3701e-02, -1.6483e+00,  1.1887e+00]], device='cuda:3')
-        transform_matrix = build_local_coordinate_system(gt_protein_pos, batch_protein, offset) # tensor([[[-0.2852, -0.3520, -0.8915], 
-        #         sum(transform_matrix[batch_protein])
-        # tensor([[ -3484.0942,  -4747.6875, -13447.3213],
-        #         [   600.6031,   -738.0328,    -42.0148],
-        #         [  -635.1982,   -581.0387,    415.1340]], device='cuda:3')
-#         sum(gt_protein_pos)
-# tensor([-0.0220,  0.0368,  0.1392], device='cuda:3')
-#sum(gt_protein_pos)
-# tensor([-0.0224,  0.0320,  0.1251], device='cuda:3')
-#
-        #sum(batch_protein)
-# tensor(228160, device='cuda:3')
-#sum(offset)
-#tensor([ 449.3897,  572.5743, 1652.6633], device='cuda:3')
+        )  
+       
+        surface_pos = surface_pos - offset[batch_surface] 
+
+        transform_matrix = build_local_coordinate_system(gt_protein_pos, batch_protein, offset)
         gt_protein_pos = torch.matmul(gt_protein_pos.unsqueeze(1), transform_matrix[batch_protein]).squeeze(1) # tensor([[-0.1629,  3.7592,  3.3262],  # tensor([[ 2.5848,  3.3384,  2.3394],
         ligand_pos = torch.matmul(ligand_pos.unsqueeze(1), transform_matrix[batch_ligand]).squeeze(1) # tensor([[ 0.5836,  0.0562,  0.2090], # tensor([[ 0.5389,  0.2922,  0.1487], #tensor([[ 0.4619, -0.2212,  0.3162],
         surface_pos = torch.matmul(surface_pos.unsqueeze(1), transform_matrix[batch_surface]).squeeze(1) # tensor([[-1.1245,  0.3584,  8.4099], tensor([[-1.4966,  4.9915,  7.3254],
-        # gt_protein_pos = gt_protein_pos / self.cfg.data.normalizer
-
+    
         t3 = time()
         t = torch.rand(
             [num_graphs, 1], dtype=ligand_pos.dtype, device=ligand_pos.device
         ).index_select(
             0, batch_ligand
-        )  # different t for different molecules.
+        )  
 
         if not self.cfg.dynamics.use_discrete_t and not self.cfg.dynamics.destination_prediction:
-            # t = torch.randint(0, 999, [num_graphs, 1], dtype=ligand_pos.dtype, device=ligand_pos.device).index_select(0, batch_ligand) #different t for different molecules.
-            # t = t / 1000.0
-            # else:
             t = torch.clamp(t, min=self.dynamics.t_min)  # clamp t to [t_min,1]
 
         t4 = time()
@@ -191,7 +155,6 @@ class SBDDTrainLoop(pl.LightningModule):
             batch_surface = batch_surface
         )
 
-        # here the discretised_loss is close for current version.
 
         loss = torch.mean(c_loss + self.cfg.train.v_loss_weight * d_loss + discretised_loss + 0.2*g_loss)
 
@@ -236,8 +199,6 @@ class SBDDTrainLoop(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        # out_data_list = self.shared_sampling_step(batch, batch_idx, sample_num_atoms='prior', desc=f'Val')
-        # return out_data_list
         pass
 
 

@@ -1,4 +1,4 @@
-project_name: &_project_name !ENV "${LOGNAME}_bfn_sbdd"
+project_name: &_project_name !ENV "${LOGNAME}_SculDrug"
 exp_name: &_exp_name !SUB ${exp_name}
 revision: &_revision !SUB ${revision}
 debug: !SUB ${debug}
@@ -10,20 +10,17 @@ test_only: !SUB ${test_only}
 empty_folder: !SUB ${empty_folder}
 
 
-#model
 dynamics:
   t_min: !SUB ${t_min}
   sigma1_coord: !SUB ${sigma1_coord}
   beta1: !SUB ${beta1}
-  protein_atom_feature_dim: 27 #TODO
+  protein_atom_feature_dim: 27 
   ligand_atom_feature_dim: 13
   use_discrete_t: !SUB ${use_discrete_t}
   discrete_steps: !SUB ${discrete_steps}
   destination_prediction: !SUB ${destination_prediction}
   sampling_strategy: !SUB ${sampling_strategy}
   
-  # no_diff_coord: !SUB ${no_diff_coord}
-  # charge_discretised_loss: !SUB ${charge_discretised_loss}
   node_indicator: True
   time_emb_dim: !SUB ${time_emb_dim}
   time_emb_mode: !SUB ${time_emb_mode}
@@ -35,14 +32,14 @@ dynamics:
       num_layers: 9
       hidden_dim: 128
       n_heads: 16
-      edge_feat_dim: 4  # edge type feat
+      edge_feat_dim: 4  #
       num_r_gaussian: 20
       knn: 32 # !
       num_node_types: 8
       act_fn: relu
       norm: True
-      cutoff_mode: knn  # [radius, none]
-      ew_net_type: global  # [r, m, none]
+      cutoff_mode: knn  
+      ew_net_type: global 
       num_x2h: 1
       num_h2x: 1
       r_max: 10.
